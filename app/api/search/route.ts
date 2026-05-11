@@ -59,11 +59,17 @@ export async function GET(request: NextRequest) {
   try {
     results = await searchAllPlatforms(session.userId, q);
   } catch (err) {
-    if (err instanceof WireError && err.class === "key-missing") {
-      return NextResponse.json({ error: "key-missing", results: [] }, { status: 403 });
+    if (err instanceof WireError) {
+      console.warn(`[search] WireError thrown: ${err.class}`);
+      if (err.class === "key-missing") {
+        return NextResponse.json({ error: "key-missing", results: [] }, { status: 403 });
+      }
+      return NextResponse.json({ error: err.class, results: [] }, { status: 500 });
     }
+    console.error("[search] Unexpected error:", err);
     throw err;
   }
 
+  console.log(`[search] q="${q}" → ${results.length} results for user ${session.userId}`);
   return NextResponse.json({ results });
 }

@@ -21,6 +21,8 @@ const bytea = customType<{ data: Buffer; driverData: string }>({
     return "\\x" + val.toString("hex");
   },
   fromDriver(val: unknown) {
+    if (Buffer.isBuffer(val)) return val;
+    if (val instanceof Uint8Array) return Buffer.from(val);
     const s = val as string;
     return Buffer.from(s.startsWith("\\x") ? s.slice(2) : s, "hex");
   },
