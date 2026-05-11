@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     status: row.status,
-    status_at: row.statusAt ? row.statusAt.toISOString() : null,
+    status_at: row.statusAt ? new Date(row.statusAt as number).toISOString() : null,
   });
 }
 
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
   }
 
   const ciphertext = encrypt(trimmed, session.userId);
-  const now = new Date();
+  const now = Date.now();
 
   await db
     .update(users)
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
 
     await db
       .update(users)
-      .set({ anakinKeyStatus: "ok", anakinKeyStatusAt: new Date() })
+      .set({ anakinKeyStatus: "ok", anakinKeyStatusAt: Date.now() })
       .where(eq(users.id, session.userId));
 
     return NextResponse.json({ status: "ok" });
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
       if (cls === "key-invalid") {
         await db
           .update(users)
-          .set({ anakinKeyStatus: "key-invalid", anakinKeyStatusAt: new Date() })
+          .set({ anakinKeyStatus: "key-invalid", anakinKeyStatusAt: Date.now() })
           .where(eq(users.id, session.userId));
         return NextResponse.json(
           {
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       if (cls === "quota-exhausted") {
         await db
           .update(users)
-          .set({ anakinKeyStatus: "quota-exhausted", anakinKeyStatusAt: new Date() })
+          .set({ anakinKeyStatus: "quota-exhausted", anakinKeyStatusAt: Date.now() })
           .where(eq(users.id, session.userId));
         return NextResponse.json({ status: "quota-exhausted" });
       }
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
         if (process.env.WIRE_MODE === "fixtures" || cls === "fixture-not-found") {
           await db
             .update(users)
-            .set({ anakinKeyStatus: "ok", anakinKeyStatusAt: new Date() })
+            .set({ anakinKeyStatus: "ok", anakinKeyStatusAt: Date.now() })
             .where(eq(users.id, session.userId));
         }
         // In live mode with a transient error, leave status as key-missing —
@@ -182,7 +182,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const now = new Date();
+  const now = Date.now();
 
   await db
     .update(users)
