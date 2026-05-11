@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "../../../../db/client";
-import { users, sessions } from "../../../../db/schema";
+import { users, sessions } from "../../../../db/tables";
 import { eq, and, gt } from "drizzle-orm";
 import { encrypt } from "../../../../db/encryption";
 import { invalidateWireCache, wireRequest } from "../../../../lib/wire/client";

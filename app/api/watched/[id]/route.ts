@@ -14,7 +14,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db, rawQuery } from "../../../../db/client";
-import { sessions, watchedQuestions } from "../../../../db/schema";
+import { sessions, watchedQuestions } from "../../../../db/tables";
 import { eq, and, gt } from "drizzle-orm";
 
 const THRESHOLD_MIN = 0.005;

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { db, rawQuery } from "../../db/client";
-import { sessions, watchedQuestions } from "../../db/schema";
+import { sessions, watchedQuestions } from "../../db/tables";
 import { eq, and, gt, count } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 

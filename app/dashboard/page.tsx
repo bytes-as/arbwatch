@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { db, rawQuery } from "../../db/client";
-import { users, sessions, spreadSnapshots, questionMatches, spreadHistory } from "../../db/schema";
+import { users, sessions, spreadSnapshots, questionMatches, spreadHistory } from "../../db/tables";
 import { eq, and, gt, inArray } from "drizzle-orm";
 import DashboardClient from "./DashboardClient";
 import type { WatchedQuestion, Platform, SpreadHistoryPoint } from "./WatchedSection";

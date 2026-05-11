@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { db } from "../../db/client";
-import { users, sessions } from "../../db/schema";
+import { users, sessions } from "../../db/tables";
 import { eq, and, gt } from "drizzle-orm";
 
 const SESSION_COOKIE_NAME =

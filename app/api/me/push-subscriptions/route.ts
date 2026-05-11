@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db, rawQuery } from "../../../../db/client";
-import { sessions } from "../../../../db/schema";
+import { sessions } from "../../../../db/tables";
 import { eq, and, gt } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 

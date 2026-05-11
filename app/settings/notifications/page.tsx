@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { db } from "../../../db/client";
-import { sessions } from "../../../db/schema";
+import { sessions } from "../../../db/tables";
 import { eq, and, gt } from "drizzle-orm";
 import PushToggle from "./PushToggle";
 

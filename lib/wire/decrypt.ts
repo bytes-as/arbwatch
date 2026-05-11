@@ -12,7 +12,7 @@
 
 import { gcm } from "@noble/ciphers/aes.js";
 import { db } from "../../db/client";
-import { users } from "../../db/schema";
+import { users } from "../../db/tables";
 import { eq } from "drizzle-orm";
 import { WireError } from "./errors";
 
