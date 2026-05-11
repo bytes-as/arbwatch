@@ -3,12 +3,13 @@ import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { skipCSRFCheck } from "@auth/core";
 import { Resend } from "resend";
 import { getDb } from "./db/client";
-import {
-  users,
-  accounts,
-  sessions,
-  verificationTokens,
-} from "./db/schema";
+
+const isNeon = (process.env.DATABASE_URL ?? "").startsWith("postgres");
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { users, accounts, sessions, verificationTokens } = isNeon
+  ? (require("./db/schema.pg") as typeof import("./db/schema.pg"))
+  : (require("./db/schema") as typeof import("./db/schema"));
 
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
 const TOKEN_MAX_AGE = 15 * 60; // 15 minutes in seconds
