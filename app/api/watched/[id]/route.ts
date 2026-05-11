@@ -40,11 +40,10 @@ async function resolveSession(
   if (!sessionToken) return null;
 
   const now = new Date();
-  const result = await db
+  const [result] = await db
     .select({ userId: sessions.userId })
     .from(sessions)
-    .where(and(eq(sessions.sessionToken, sessionToken), gt(sessions.expires, now)))
-    .get();
+    .where(and(eq(sessions.sessionToken, sessionToken), gt(sessions.expires, now)));
 
   return result ? { userId: result.userId } : null;
 }
@@ -64,7 +63,7 @@ export async function DELETE(
 
   const { id } = params;
 
-  const row = await db
+  const [row] = await db
     .select({ id: watchedQuestions.id })
     .from(watchedQuestions)
     .where(
@@ -72,8 +71,7 @@ export async function DELETE(
         eq(watchedQuestions.id, id),
         eq(watchedQuestions.userId, session.userId)
       )
-    )
-    .get();
+    );
 
   if (!row) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -137,7 +135,7 @@ export async function PATCH(
       ? null
       : (rawThreshold as number);
 
-  const row = await db
+  const [row] = await db
     .select({ id: watchedQuestions.id })
     .from(watchedQuestions)
     .where(
@@ -145,8 +143,7 @@ export async function PATCH(
         eq(watchedQuestions.id, id),
         eq(watchedQuestions.userId, session.userId)
       )
-    )
-    .get();
+    );
 
   if (!row) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -35,11 +35,10 @@ async function resolveSession(): Promise<{ userId: string } | null> {
   if (!sessionToken) return null;
 
   const now = new Date();
-  const result = await db
+  const [result] = await db
     .select({ userId: sessions.userId })
     .from(sessions)
-    .where(and(eq(sessions.sessionToken, sessionToken), gt(sessions.expires, now)))
-    .get();
+    .where(and(eq(sessions.sessionToken, sessionToken), gt(sessions.expires, now)));
 
   return result ? { userId: result.userId } : null;
 }
@@ -68,11 +67,10 @@ export async function addWatchedQuestionAction(
     return { error: `Question must be ${MAX_QUERY_TEXT_LENGTH} characters or fewer.` };
   }
 
-  const countResult = await db
+  const [countResult] = await db
     .select({ cnt: count() })
     .from(watchedQuestions)
-    .where(eq(watchedQuestions.userId, session.userId))
-    .get();
+    .where(eq(watchedQuestions.userId, session.userId));
 
   const existing = countResult?.cnt ?? 0;
   if (existing >= QUESTION_CAP) {
@@ -102,7 +100,7 @@ export async function removeWatchedQuestionAction(
   const id = formData.get("question_id");
   if (typeof id !== "string" || !id) return;
 
-  const row = await db
+  const [row] = await db
     .select({ id: watchedQuestions.id })
     .from(watchedQuestions)
     .where(
@@ -110,8 +108,7 @@ export async function removeWatchedQuestionAction(
         eq(watchedQuestions.id, id),
         eq(watchedQuestions.userId, session.userId)
       )
-    )
-    .get();
+    );
 
   if (!row) return;
 

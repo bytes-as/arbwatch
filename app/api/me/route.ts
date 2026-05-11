@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   }
 
   const now = new Date();
-  const result = await db
+  const [result] = await db
     .select({
       id: users.id,
       email: users.email,
@@ -34,8 +34,7 @@ export async function GET(request: NextRequest) {
         eq(sessions.sessionToken, sessionToken),
         gt(sessions.expires, now)
       )
-    )
-    .get();
+    );
 
   if (!result) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

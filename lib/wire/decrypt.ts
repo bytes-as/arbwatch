@@ -52,14 +52,13 @@ export function decryptAESGCM({
  * The returned string is scoped to the call frame — never store it.
  */
 export async function getDecryptedAnakinKey(userId: string): Promise<string> {
-  const row = await db
+  const [row] = await db
     .select({
       anakinKeyCt: users.anakinKeyCt,
       anakinKeyStatus: users.anakinKeyStatus,
     })
     .from(users)
-    .where(eq(users.id, userId))
-    .get();
+    .where(eq(users.id, userId));
 
   if (!row) {
     throw new WireError({ class: "key-missing" });

@@ -39,11 +39,10 @@ async function resolveSession(
   if (!sessionToken) return null;
 
   const now = new Date();
-  const result = await db
+  const [result] = await db
     .select({ userId: sessions.userId })
     .from(sessions)
-    .where(and(eq(sessions.sessionToken, sessionToken), gt(sessions.expires, now)))
-    .get();
+    .where(and(eq(sessions.sessionToken, sessionToken), gt(sessions.expires, now)));
 
   if (!result) return null;
   return { userId: result.userId };
@@ -59,14 +58,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const row = await db
+  const [row] = await db
     .select({
       status: users.anakinKeyStatus,
       statusAt: users.anakinKeyStatusAt,
     })
     .from(users)
-    .where(eq(users.id, session.userId))
-    .get();
+    .where(eq(users.id, session.userId));
 
   if (!row) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -162,11 +160,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Non-Wire transport failure: key stored, probe deferred.
-    const current = await db
+    const [current] = await db
       .select({ status: users.anakinKeyStatus })
       .from(users)
-      .where(eq(users.id, session.userId))
-      .get();
+      .where(eq(users.id, session.userId));
 
     return NextResponse.json({
       status: current?.status ?? "key-missing",

@@ -30,7 +30,7 @@ async function getUserInfo(): Promise<{
   if (!sessionToken) return null;
 
   const now = new Date();
-  const result = await db
+  const [result] = await db
     .select({
       userId: sessions.userId,
       email: users.email,
@@ -38,8 +38,7 @@ async function getUserInfo(): Promise<{
     })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
-    .where(and(eq(sessions.sessionToken, sessionToken), gt(sessions.expires, now)))
-    .get();
+    .where(and(eq(sessions.sessionToken, sessionToken), gt(sessions.expires, now)));
 
   if (!result) return null;
   return {

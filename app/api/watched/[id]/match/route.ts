@@ -35,11 +35,10 @@ async function resolveSession(req: NextRequest): Promise<{ userId: string } | nu
     req.cookies.get("authjs.session-token")?.value;
   if (!token) return null;
   const now = new Date();
-  const row = await db
+  const [row] = await db
     .select({ userId: sessions.userId })
     .from(sessions)
-    .where(and(eq(sessions.sessionToken, token), gt(sessions.expires, now)))
-    .get();
+    .where(and(eq(sessions.sessionToken, token), gt(sessions.expires, now)));
   return row ? { userId: row.userId } : null;
 }
 
