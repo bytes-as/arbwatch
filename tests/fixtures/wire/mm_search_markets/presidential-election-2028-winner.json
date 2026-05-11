@@ -1,0 +1,26 @@
+{
+  "_fixture_meta": {
+    "action": "mm_search_markets",
+    "query": "Presidential election 2028 winner",
+    "slug": "presidential-election-2028",
+    "recorded": "2026-05-11T00:00:00Z",
+    "note": "Synthetic fixture — Manifold AMM: probability in [0,1], treated as bid==ask==midpoint per ADR-0002 §Field mapping"
+  },
+  "markets": [
+    {
+      "id": "MM-PRES-2028",
+      "question": "Will a Democrat win the 2028 Presidential election?",
+      "url": "https://manifold.markets/market/will-democrat-win-2028-presidential",
+      "outcomeType": "BINARY",
+      "probability": 0.53,
+      "pool": {
+        "YES": 85000,
+        "NO": 75000
+      },
+      "totalLiquidity": 15000,
+      "volume": 320000,
+      "isResolved": false,
+      "closeTime": 1857340799000
+    }
+  ]
+}

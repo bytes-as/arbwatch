@@ -1,0 +1,8 @@
+{
+  "_fixture_meta": {
+    "action": "rh_get_markets",
+    "slug": "__default__",
+    "note": "Empty fallback fixture — loaded when no slug-specific file exists. Matcher should produce zero Robinhood rows for this query."
+  },
+  "events": []
+}

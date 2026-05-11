@@ -1,0 +1,26 @@
+{
+  "role": "QA",
+  "taskId": "task-billing-schema-test",
+  "storyId": "billing-schema",
+  "phase": "pre-implementation",
+  "sprint": 1,
+  "startedAt": "2026-05-11T10:02:06Z",
+  "lastTick": "2026-05-11T10:04:45Z",
+  "status": "completed",
+  "completedAt": "2026-05-11T10:04:45Z",
+  "plan": [
+    "Read template and infrastructure files",
+    "Write tests/billing/schema.test.ts",
+    "Update vitest.workspace.ts (add billing project + exclude from other)",
+    "Run npx vitest run --project billing and confirm failures",
+    "Write final heartbeat"
+  ],
+  "stepIndex": 4,
+  "currentStep": "Done",
+  "toolsUsed": ["Bash", "Read", "Write", "Edit"],
+  "filesModified": [
+    "tests/billing/schema.test.ts",
+    "vitest.workspace.ts",
+    ".sdlc/agents/qa-task-billing-schema-test.json"
+  ]
+}

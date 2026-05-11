@@ -1,0 +1,1353 @@
+phases:
+  - id: phase-1-mvp
+    title: "MVP: Watched questions + email alerts"
+    description: >
+      Email magic-link signup, BYO Anakin API key on onboarding, up to 5 watched
+      questions via free-text query, cross-platform matching via Wire actions
+      using the user's key, 5-min spread refresh, email alert when spread > 3%.
+      Demo-ready polish.
+    successCriteria:
+      - User signs up via email magic-link; session persists across browser restarts
+      - During onboarding, user pastes an Anakin API key; key is encrypted at rest and used only for that user's Wire calls
+      - If a user's Anakin key is missing, invalid, or quota-exhausted, dashboard surfaces a clear error and that user's spread refresh is paused
+      - User adds up to 5 watched questions by free-text query; matching finds markets across all 4 platforms for ≥3 of 5 seeded test queries
+      - Cron updates spreads at least every 5 min per user; spread = max(implied_yes_prob) − min(implied_yes_prob)
+      - Email alert sent within 60s of cron run when threshold (default 3%) crossed
+      - Dashboard shows watched questions with current spread, last-updated, deeplinks to all 4 platforms
+      - ./preview.sh starts service against seeded SQLite (3 test questions, 1 fixture user) and prints http://localhost:3000
+      - README quickstart works copy-pasted in <60s
+      - Disclaimer "arb ≠ profit; slippage and fees may eat spread" present on every spread view
+    status: done
+    closeNotes: "All 10 success criteria implementation-complete across 4 sprints. Two human-verification items (live-server Playwright run + real-Wire field-mapping spot-check) deferred at user direction; tracked in .sdlc/PHASE_HUMAN_CHECK.md for Phase-1-close hygiene; can be done in parallel with Phase 2 sprints."
+
+  - id: phase-2-v1.5
+    title: "v1.5: Multi-user + smarter matching"
+    description: >
+      Per-question custom thresholds, web-push notifications, embedding-based
+      matching, 7-day spread history chart. Trigger: ≥10 organic signups.
+    successCriteria:
+      - Two or more users use the system simultaneously with isolated watched lists and isolated Anakin keys
+      - Per-question custom threshold (override of global 3%) works end-to-end
+      - Web-push notification delivered within 60s of threshold crossing
+      - Embedding-based matching beats Phase 1 free-text matching on a seeded eval set (≥80% accuracy)
+      - Each question shows a 7-day spread history chart
+    status: in_progress
+
+  - id: phase-3-v2
+    title: "v2: Paid tier"
+    description: >
+      Stripe billing, Google SSO, Free (5 questions) / Paid ($19/mo, unlimited)
+      plans, custom rule engine. Trigger: 50+ signups with ≥5 asking for paid features.
+    successCriteria:
+      - Google SSO signup/login works alongside email magic-link
+      - Stripe subscription checkout succeeds; webhook flips user to paid plan
+      - Paid plan removes 5-question cap; free plan enforces it
+      - Custom rule engine evaluates user-authored rules and alerts when matched
+      - Downgrade/cancel flow restores free-tier limits without data loss
+      - Paid tier never subsidizes Wire credits — billing is for product features only
+    status: planning
+
+  - id: phase-4-v2.5
+    title: "v2.5: Auto-execution (Power tier)"
+    description: >
+      $99/mo tier with capital-managed auto-execution against user's own Kalshi
+      + Polymarket accounts. Trigger: paid-tier MRR > $1k for 2 months.
+    successCriteria:
+      - User securely stores Kalshi API key + Polymarket wallet sig (encrypted at rest)
+      - Capital-management rules enforced before any order
+      - End-to-end test executes paired YES/NO order on Kalshi + Polymarket against testnet
+      - Funds never custodied — every order routes through user's connected account
+      - Kill switch disables auto-execution immediately without losing in-flight settlement tracking
+    status: not_started
+
+epics:
+  # ----- Phase 1 epics -----
+
+  - id: epic-foundation
+    phase: phase-1-mvp
+    title: Foundation
+    description: Stack ADR, Wire-integration ADR, app skeleton, preview.sh, README quickstart.
+    stories:
+      - id: story-stack-decision
+        title: Decide the stack
+        status: done
+        description: >
+          Choose runtime, framework, DB (SQLite-seedable for Phase 1), background
+          scheduler for 5-min cron, email transport, secrets/encryption, and
+          deploy target. Free-tier hosting is a hard requirement; if Vercel +
+          NextAuth + Resend + Neon/Supabase free tiers don't fit, justify why.
+        priority: P0
+        tasks:
+          - id: task-stack-adr
+            title: Write ADR for stack selection
+            owner: architect
+            status: done
+            attempts: 1
+            artifacts:
+              - docs/architecture/0001-stack.md
+            definitionOfDone:
+              - docs/architecture/0001-stack.md exists with Context, Options, Decision, Consequences
+              - covers web framework, DB, scheduler, email transport, secret-encryption library, deploy target
+              - all chosen services fit free tiers OR the ADR documents why a paid choice is required
+              - aligns with PROJECT.md constraints (Architect-decides, demo-ready, BYOC)
+
+      - id: story-wire-integration-adr
+        title: Decide how Wire actions are invoked per-user
+        status: done
+        description: >
+          Document how the app calls kl_events, mm_search_markets, pm_get_events,
+          rh_get_events using each user's Anakin key — client lib, retry/backoff,
+          fixtures for local dev, key-failure handling, fields needed to compute
+          implied_yes_prob on each platform.
+        priority: P0
+        tasks:
+          - id: task-wire-adr
+            title: ADR for Wire integration + per-user credential scoping
+            owner: architect
+            status: done
+            attempts: 1
+            artifacts:
+              - docs/architecture/0002-wire-integration.md
+            definitionOfDone:
+              - docs/architecture/0002-wire-integration.md exists
+              - specifies client lib, per-call credential injection from user record, retry/backoff, rate-limit handling, fixture mode for local dev (no live keys)
+              - enumerates the fields per platform needed to compute implied_yes_prob (yes ask/bid/midpoint convention picked explicitly)
+              - defines the error taxonomy for key-missing / key-invalid / quota-exhausted
+
+      - id: story-skeleton
+        title: App skeleton + preview.sh + README
+        status: done
+        description: >
+          Web app boots locally via ./preview.sh against seeded SQLite (3 test
+          questions, 1 fixture user with a stub Anakin key). Root URL renders
+          a placeholder shell. README quickstart copy-pastes to a running app
+          in <60s.
+        priority: P1
+        tasks:
+          - id: task-skeleton-test
+            title: Failing tests for skeleton + preview.sh contract
+            owner: qa
+            status: done
+            attempts: 1
+            artifacts:
+              - tests/skeleton/root-endpoint.test.ts
+              - tests/skeleton/seed.test.ts
+              - tests/skeleton/preview-sh.spec.ts
+              - tests/seeds/queries.yaml
+              - package.json
+              - tsconfig.json
+              - vitest.config.ts
+              - playwright.config.ts
+            definitionOfDone:
+              - tests assert the root endpoint returns 200 with the app shell
+              - tests assert ./preview.sh starts the service, prints "http://localhost:3000", and that URL responds
+              - tests assert seed loads 3 test questions and 1 fixture user
+              - tests fail before implementation
+          - id: task-skeleton-impl
+            title: Implement minimal app skeleton per ADR
+            owner: backend
+            status: done
+            attempts: 1
+            artifacts:
+              - app/layout.tsx
+              - app/page.tsx
+              - app/signin/page.tsx
+              - db/schema.ts
+              - db/encryption.ts
+              - db/client.ts
+              - drizzle.config.ts
+              - drizzle/0000_even_mysterio.sql
+              - scripts/seed.ts
+              - instrumentation.ts
+              - next.config.ts
+              - preview.sh
+              - .env.example
+              - .gitignore
+            definitionOfDone:
+              - skeleton tests pass
+              - app starts cleanly via runtime command from ADR-0001
+          - id: task-preview-sh
+            title: preview.sh seeds DB and runs the app
+            owner: devops
+            status: done
+            attempts: 1
+            artifacts:
+              - preview.sh
+            notes: >
+              Absorbed by task-skeleton-impl in the same wave; preview.sh was
+              authored by the backend agent (sourcing .env, running drizzle
+              migrate, npm run seed, then npm run dev with FIFO-based stdout
+              capture that prints "http://localhost:3000" on its own line once
+              "Ready in Xs" appears). User subsequently tweaked the .env
+              hydration block to skip already-set vars so the Playwright
+              harness can override DATABASE_URL. Contract test (3 Playwright
+              specs) passes against the live file.
+          - id: task-readme-quickstart
+            title: README quickstart works copy-pasted in <60s
+            owner: tech_writer
+            status: done
+            attempts: 1
+            artifacts:
+              - README.md
+            definitionOfDone:
+              - README.md Quickstart lists exact commands, required env vars, runtime version
+              - QA verifies a clean checkout reaches http://localhost:3000 in <60s on the maintainer's machine
+              - prerequisites explicit (no "obvious" steps assumed)
+
+  - id: epic-auth-and-credentials
+    phase: phase-1-mvp
+    title: Magic-link auth + BYO Anakin key onboarding
+    description: >
+      Single-user signup via email magic-link; on first login, user pastes their
+      Anakin API key, encrypted at rest. App scopes every Wire call to that key.
+    stories:
+      - id: story-onboarding-design
+        title: Magic-link + BYO-key onboarding UX
+        status: done
+        description: >
+          Sign-in screen, "check your email" state, magic-link landing, expired/used-link
+          error, post-login "paste your Anakin key" onboarding (with where-to-get-it link),
+          and key-error states (missing / invalid / quota-exhausted).
+        priority: P0
+        tasks:
+          - id: task-onboarding-design
+            title: UX spec for auth + key onboarding
+            owner: designer
+            status: done
+            attempts: 1
+            artifacts:
+              - docs/design/auth-and-onboarding.md
+            definitionOfDone:
+              - docs/design/auth-and-onboarding.md exists with flows, states, copy, accessibility notes
+              - covers happy-path signup, expired/used link, key paste, invalid key, quota-exhausted key, signed-in revisit
+              - copy includes Anakin-key help text and link target
+
+      - id: story-magic-link-auth
+        title: Magic-link auth + persistent session
+        status: done
+        description: User enters email → receives single-use token → clicks → authenticated session that survives browser restart.
+        priority: P0
+        tasks:
+          - id: task-auth-test
+            title: Failing tests for magic-link + session persistence
+            owner: qa
+            status: done
+            attempts: 1
+            artifacts:
+              - tests/auth/magic-link-request.test.ts
+              - tests/auth/token-redemption.test.ts
+              - tests/auth/expired-replay.test.ts
+              - tests/auth/session-persistence.spec.ts
+              - tests/auth/redirect-when-authenticated.spec.ts
+              - tests/auth/__mocks__/resend.ts
+              - tests/auth/helpers/fixture-user.ts
+            definitionOfDone:
+              - tests assert requesting a magic link enqueues an email with a single-use token
+              - tests assert visiting a valid token URL creates an authenticated session
+              - tests assert expired and already-used tokens are rejected
+              - tests assert session cookie persists across simulated browser restart (max-age + storage check)
+              - tests fail before implementation
+          - id: task-auth-backend
+            title: Magic-link endpoints + session store
+            owner: backend
+            status: done
+            attempts: 1
+            notes: "21/21 auth Vitest tests pass. 10 Playwright tests still pending — those require sign-in/check-email frontend pages (task-auth-frontend)."
+            artifacts:
+              - app/api/auth/[...nextauth]/route.ts
+              - app/api/me/route.ts
+              - middleware.ts
+              - tests/auth/server-setup.ts
+            definitionOfDone:
+              - auth tests pass
+              - tokens single-use, time-limited (per ADR-0001), signed
+              - email transport from ADR-0001 delivers token email in local dev (fixture inbox)
+          - id: task-auth-frontend
+            title: Sign-in + check-email + landing screens
+            owner: frontend
+            status: done
+            attempts: 1
+            notes: "10/10 Playwright auth tests pass; sign-in form, check-email, dashboard placeholder, error banners all wired."
+            artifacts:
+              - app/signin/page.tsx
+              - app/signin/SignInForm.tsx
+              - app/check-email/page.tsx
+              - app/check-email/ResendButton.tsx
+              - app/dashboard/page.tsx
+              - app/globals.css
+              - app/api/test-inbox/latest/route.ts
+              - auth.ts
+              - next.config.ts
+            definitionOfDone:
+              - screens match design spec
+              - keyboard/ARIA per design spec
+          - id: task-auth-security-review
+            title: Security review of auth flow
+            owner: security
+            status: done
+            attempts: 1
+            artifacts:
+              - docs/security/auth-review.md
+            notes: "Verdict: Phase 1 close unblocked. 4 follow-ups: F1 (rate-limit, MEDIUM, Phase 2), F2 (CSRF env-var scoping, LOW, Sprint 3), F3 (/api/me in middleware matcher, LOW, Sprint 3), F4 (token timing, INFO, accepted)."
+            definitionOfDone:
+              - docs/security/auth-review.md exists
+              - covers token entropy, replay, timing-safe token lookup, cookie flags (HttpOnly, Secure, SameSite), post-login open-redirect
+
+      - id: story-anakin-key-storage
+        title: BYO Anakin key — paste, encrypt, use, rotate
+        status: done
+        description: >
+          Authenticated user can paste an Anakin API key on first login (or
+          rotate later). Key is encrypted at rest and used for every Wire call
+          scoped to that user.
+        priority: P0
+        tasks:
+          - id: task-key-test
+            title: Failing tests for key paste, encryption, use, rotation, removal
+            owner: qa
+            status: done
+            attempts: 1
+            artifacts:
+              - tests/key/encryption.test.ts
+              - tests/key/rotation.test.ts
+              - tests/key/isolation.test.ts
+              - tests/key/onboarding-flow.spec.ts
+              - tests/key/helpers/db-inspect.ts
+              - tests/key/helpers/fixture-key.ts
+              - tests/seeds/queries.yaml
+            definitionOfDone:
+              - tests assert pasted key is stored encrypted (raw plaintext absent from DB row inspection)
+              - tests assert Wire client receives the decrypted key only at call time, never logs it
+              - tests assert key rotation replaces the stored value and invalidates any cached client
+              - tests assert key removal disables Wire calls for that user
+              - tests assert two users' keys are isolated (user A's key never used for user B's calls)
+              - tests fail before implementation
+          - id: task-key-backend
+            title: Key paste / rotate / remove endpoints + encrypted column
+            owner: backend
+            status: done
+            attempts: 1
+            notes: "42/42 Vitest tests pass after the synthetic QA fix landed. Probe-based status progression: POST/anakin-key keeps status=key-missing until a Wire probe confirms validity (per ADR-0002)."
+            artifacts:
+              - app/api/me/anakin-key/route.ts
+              - lib/wire/client.ts
+              - lib/wire/decrypt.ts
+              - tests/server/key-server-setup.ts
+              - vitest.workspace.ts
+            definitionOfDone:
+              - key tests pass
+              - encryption library and key-management scheme per ADR-0001
+              - key never appears in application logs (logger redaction enforced + unit test)
+              - users table has anakin_key_status enum (ok | key-missing | key-invalid | quota-exhausted) and anakin_key_status_at timestamp per ADR-0002 error taxonomy
+          - id: task-key-frontend
+            title: Onboarding "paste your Anakin key" + settings rotation UI
+            owner: frontend
+            status: done
+            attempts: 1
+            notes: "18/19 Playwright key onboarding tests pass; one test.skip()'d by design. Dashboard has ?welcome=1 bypass for first arrival from onboarding."
+            artifacts:
+              - app/onboarding/anakin-key/page.tsx
+              - app/settings/page.tsx
+              - app/dashboard/page.tsx
+              - db/client.ts
+          - id: task-key-test-fix
+            title: "[synthetic] Fix encryption.test.ts Suite-1 afterAll to reset db=undefined"
+            owner: qa
+            status: done
+            attempts: 1
+            requestedBy: task-key-backend
+            artifacts:
+              - tests/key/encryption.test.ts
+            definitionOfDone:
+              - onboarding screen matches design spec; user cannot reach dashboard until a key is supplied
+              - settings screen supports rotating and removing the key
+              - error states (invalid format, server error) render per spec
+          - id: task-key-security-review
+            title: Security review of credential storage
+            owner: security
+            status: done
+            attempts: 1
+            artifacts:
+              - docs/security/credential-storage-review.md
+            notes: "Verdict: Phase 1 close unblocked. 6 follow-ups: F1 key rotation (MEDIUM, Phase 3), F2 KMS hop (MEDIUM, Phase 3), F3 Pino+redact (LOW, Phase 2), F4 inline probe on key-paste (LOW UX, Sprint 3), F5 test reconciliation (LOW, Sprint 3), F6 all-zero-key prod guard (MEDIUM, pre-prod)."
+            definitionOfDone:
+              - docs/security/credential-storage-review.md exists
+              - covers encryption-at-rest scheme, KMS/env-secret threat model, log redaction, exposure surface in error paths, IDOR on key endpoints
+
+  - id: epic-sprint-2-hardening
+    phase: phase-1-mvp
+    title: Sprint 2 hardening — security review follow-ups
+    description: >
+      Low/medium-severity items raised by the Sprint 2 security reviews that
+      should land alongside Sprint 3 implementation work. Each is a one-to-three
+      line change; bundled into a single epic so Sprint 3 can take them in
+      parallel with the heavier matching/cron work.
+    stories:
+      - id: story-sprint-2-hardening
+        title: Apply Sprint 2 security follow-ups
+        status: done
+        priority: P1
+        description: F2 (CSRF env), F3 (middleware matcher), F4 (probe-on-paste), F5 (test reconciliation), F6 (zero-key prod guard).
+        tasks:
+          - id: task-csrf-env-flag
+            title: Replace NODE_ENV==test CSRF skip with SKIP_CSRF_CHECK env var (F2)
+            owner: backend
+            status: done
+            attempts: 1
+            definitionOfDone:
+              - auth.ts no longer gates skipCSRFCheck on NODE_ENV
+              - reads explicit SKIP_CSRF_CHECK=true env var
+              - .env.example documents the var as "test only — never set in staging/prod"
+              - existing 21/21 auth Vitest still pass with SKIP_CSRF_CHECK=true in test env
+          - id: task-middleware-api-me
+            title: Add /api/me to middleware matcher (F3)
+            owner: backend
+            status: done
+            attempts: 1
+            definitionOfDone:
+              - middleware.ts matcher includes /api/me
+              - unauthenticated GET /api/me from a browser context redirects to /signin
+              - 10/10 auth Playwright still pass
+          - id: task-probe-on-paste
+            title: Wire inline Wire probe on key-paste; transition status to ok on probe success (F4)
+            owner: backend
+            status: done
+            attempts: 1
+            definitionOfDone:
+              - POST /api/me/anakin-key calls the Wire probe inline on success
+              - status transitions to ok | key-invalid | quota-exhausted based on probe result, then HTTP response reflects same
+              - dashboard banner no longer persists for valid keys after paste
+              - test reconciliation for encryption.test.ts Suite-1 line 254 included (F5)
+              - 42/42 key Vitest still pass
+          - id: task-zero-key-prod-guard
+            title: Fail-fast for all-zero APP_ENCRYPTION_KEY in production (F6)
+            owner: backend
+            status: done
+            attempts: 1
+            definitionOfDone:
+              - db/encryption.ts:getKey() throws at server start when NODE_ENV=production AND decoded key bytes are all zero
+              - unit test asserts production-mode throw; dev-mode passes
+              - error message names the env var by name without echoing its value
+
+  - id: epic-watched-questions-and-matching
+    phase: phase-1-mvp
+    title: Watched questions + cross-platform matching + 5-min spread cron
+    description: >
+      Authenticated user adds up to 5 free-text watched questions. Backend
+      matches each to markets on Kalshi, Manifold, Polymarket, Robinhood via
+      Wire actions using that user's Anakin key. A 5-min cron refreshes spreads.
+      Key failure pauses refresh for that user with a clear error.
+    stories:
+      - id: story-watched-questions-crud
+        title: Add / list / remove watched questions (cap 5)
+        status: done
+        description: Authenticated user can manage up to 5 free-text watched questions.
+        priority: P0
+        tasks:
+          - id: task-watched-test
+            title: Failing tests for CRUD + 5-cap
+            owner: qa
+            status: done
+            attempts: 1
+            artifacts:
+              - tests/watched/crud.test.ts
+              - tests/watched/dashboard-watched.spec.ts
+              - tests/watched/helpers/fixture-watched.ts
+              - tests/server/watched-server-setup.ts
+              - vitest.workspace.ts
+            definitionOfDone:
+              - tests assert add succeeds for questions 1-5
+              - tests assert 6th add returns a cap-exceeded error
+              - tests assert list returns only the authenticated user's questions
+              - tests assert remove deletes the question and any cached matches
+              - tests fail before implementation
+          - id: task-watched-backend
+            title: Watched-question endpoints
+            owner: backend
+            status: done
+            attempts: 1
+            artifacts:
+              - app/api/watched/route.ts
+              - app/api/watched/[id]/route.ts
+              - tests/server/watched-server-setup.ts
+            notes: "26/26 watched pass; 42/42 key + 14 skeleton remain green. Cascade-to-question_matches wired but inactive until matching impl lands the schema."
+            definitionOfDone:
+              - CRUD tests pass
+              - schema includes id, user_id, query_text, created_at
+          - id: task-watched-frontend
+            title: UI for add / list / remove
+            owner: frontend
+            status: done
+            attempts: 2
+            notes: "Implementation written by the looping zeus:frontend agent in waves 3a/3b; orchestrator verified the code matches the test contract (copy strings, aria-labels, inline confirm 'Remove this question?' + 'Yes, remove'/'Cancel', counter 'X / 5 watched', cap states, empty state). 26/26 watched Vitest pass. Playwright verification deferred (requires live preview.sh server)."
+            artifacts:
+              - app/dashboard/page.tsx
+              - app/dashboard/DashboardClient.tsx
+              - app/dashboard/WatchedSection.tsx
+              - app/dashboard/actions.ts
+            definitionOfDone:
+              - add form, list view, remove control functional
+              - cap-exceeded message renders per design spec
+
+      - id: story-cross-platform-matching
+        title: Free-text query → markets on all 4 platforms (per-user Wire)
+        status: done
+        description: >
+          On add and on periodic re-match, backend queries kl_events,
+          mm_search_markets, pm_get_events, rh_get_events using the user's
+          Anakin key and stores per-platform market refs.
+        priority: P0
+        tasks:
+          - id: task-matching-test
+            title: Failing tests for matching against seeded query set
+            owner: qa
+            status: done
+            attempts: 1
+            artifacts:
+              - tests/matching/matching.test.ts
+              - tests/fixtures/wire/README.md
+              - tests/fixtures/wire/kl_events/
+              - tests/fixtures/wire/mm_search_markets/
+              - tests/fixtures/wire/pm_get_events/
+              - tests/fixtures/wire/rh_get_events/
+              - tests/seeds/matching-queries.yaml
+              - scripts/record-wire-fixture.ts
+            definitionOfDone:
+              - tests/seeds/queries.yaml lists 5 seeded test queries with expected per-platform market identifiers (Wire fixtures committed)
+              - tests/fixtures/wire/<action>/<slug>.json fixtures recorded per ADR-0002 (scripts/record-wire-fixture.ts authored if not already present)
+              - tests verify the implied_yes_prob JSON paths per platform from ADR-0002 §"Field mapping per platform" against the recorded fixtures (update lib/wire/mapping.ts if any path is wrong)
+              - tests assert matching finds markets on all 4 platforms for ≥3 of the 5 seeded queries
+              - per-question stored match includes (platform, market_id, market_url, implied_yes_prob_field_path)
+              - tests assert Wire calls in fixture mode never hit a live endpoint
+              - tests fail before implementation
+          - id: task-matching-impl
+            title: Phase-1 matching (free-text → Wire results)
+            owner: backend
+            status: done
+            attempts: 1
+            notes: "35/35 matching tests pass; 26/26 watched + 42/42 key + 9/9 skeleton-seed still pass. question_matches schema with ON DELETE CASCADE landed; matchQuestion invoked inline on POST /api/watched."
+            artifacts:
+              - db/schema.ts
+              - drizzle/0002_clean_puff_adder.sql
+              - lib/wire/mapping.ts
+              - lib/matching.ts
+              - app/api/watched/route.ts
+              - tests/server/matching-setup.ts
+              - tests/fixtures/wire/ (slug aliases)
+            definitionOfDone:
+              - matching tests pass
+              - matching pipeline + scoring rules documented inline
+              - retry/backoff per ADR-0002
+
+      - id: story-spread-cron
+        title: 5-min cron refreshes spreads per user
+        status: done
+        description: >
+          Background job runs at least every 5 minutes. For each user with a
+          valid Anakin key, fetches latest implied_yes_prob per (question,
+          platform), computes spread, records last-updated. Key-failed users
+          are paused (no Wire spend, no spurious zero spreads).
+        priority: P0
+        tasks:
+          - id: task-cron-test
+            title: Failing tests for cadence, formula, and key-failure pause
+            owner: qa
+            status: done
+            attempts: 1
+            artifacts:
+              - tests/cron/cadence.test.ts
+              - tests/cron/refresh-spreads.test.ts
+              - tests/cron/helpers/cron-fixtures.ts
+            definitionOfDone:
+              - test asserts cron registers at ≤5-min interval per ADR-0001 runtime
+              - test asserts spread = max(implied_yes_prob) − min(implied_yes_prob) across platforms where the question exists
+              - test asserts questions present on only one platform record spread = null (not zero) and are skipped for alerting
+              - test asserts last_updated timestamp recorded per refresh
+              - test asserts users with missing/invalid/quota-exhausted keys are skipped, their dashboard shows the documented error, and no Wire call is attempted
+              - tests fail before implementation
+          - id: task-cron-impl
+            title: Implement spread-refresh job
+            owner: backend
+            status: done
+            attempts: 1
+            notes: "48/48 cron tests pass; no regressions on matching/watched/seed."
+            artifacts:
+              - lib/cron.ts
+              - app/api/cron/refresh-spreads/route.ts
+              - lib/wire/client.ts
+              - tests/server/matching-setup.ts
+            definitionOfDone:
+              - cron tests pass
+              - per-question spread snapshot persisted
+
+  - id: epic-dashboard-and-alerts
+    phase: phase-1-mvp
+    title: Dashboard + email alerts + disclaimer
+    description: >
+      Web dashboard lists watched questions with current spread, last-updated,
+      deeplinks. Email alert fires within 60s of cron when spread > 3%. The
+      required disclaimer appears on every spread view (UI and email).
+    stories:
+      - id: story-dashboard-design
+        title: Dashboard UX spec
+        status: done
+        description: Layout, spread color rules (green >3%), empty state, key-error banner, disclaimer placement, deeplink affordance, freshness indicator.
+        priority: P0
+        tasks:
+          - id: task-dashboard-design
+            title: UX spec for dashboard
+            owner: designer
+            status: done
+            attempts: 1
+            artifacts:
+              - docs/design/dashboard.md
+            definitionOfDone:
+              - docs/design/dashboard.md exists with layout, states, copy, accessibility
+              - disclaimer placement on every spread view specified
+              - key-missing / key-invalid / quota-exhausted banner specified
+              - color and freshness affordances specified
+
+      - id: story-dashboard-impl
+        title: Build dashboard
+        status: done
+        description: Render watched questions with spread, last-updated, deeplinks, disclaimer, and key-error states.
+        priority: P0
+        tasks:
+          - id: task-dashboard-test
+            title: Failing tests for dashboard contract
+            owner: qa
+            status: done
+            attempts: 1
+            artifacts:
+              - tests/dashboard/dashboard-spreads.spec.ts
+            notes: "20 Playwright tests across 9 describe groups; references /api/test-seed-spreads and /api/test-set-key-status helper routes the frontend impl must provide for seeding."
+            definitionOfDone:
+              - test asserts dashboard lists the user's watched questions with current spread and last-updated
+              - test asserts each row renders deeplinks to all platforms where the question was matched
+              - test asserts spread > 3% renders the green treatment per design spec
+              - test asserts disclaimer is present on every page that shows a spread
+              - test asserts key-error banner renders when user's Anakin key is missing/invalid/quota-exhausted
+              - tests fail before implementation
+          - id: task-dashboard-impl
+            title: Implement dashboard
+            owner: frontend
+            status: done
+            attempts: 1
+            notes: "Spread + timestamp + 4-platform chips + test-helper routes (NODE_ENV=test guarded). Frontend agent completed cleanly with explicit no-Playwright-loop guardrail. App-code TypeScript compiles with zero errors."
+            artifacts:
+              - app/dashboard/WatchedSection.tsx
+              - app/dashboard/page.tsx
+              - app/globals.css
+              - app/api/test-seed-spreads/route.ts
+              - app/api/test-set-key-status/route.ts
+            definitionOfDone:
+              - dashboard tests pass
+              - matches design spec for layout, states, color, accessibility
+
+      - id: story-email-alerts
+        title: Threshold-crossed email alerts (default 3%)
+        status: done
+        description: >
+          When a spread crosses the 3% threshold, send a templated email to
+          the user within 60s of the cron run. No duplicate alerts until the
+          spread re-crosses.
+        priority: P0
+        tasks:
+          - id: task-alerts-test
+            title: Failing tests for alert dispatch, SLA, hysteresis
+            owner: qa
+            status: done
+            attempts: 1
+            artifacts:
+              - tests/alerts/alerts.test.ts
+              - vitest.workspace.ts
+            definitionOfDone:
+              - test asserts a 0%→4% crossing on a watched question enqueues an alert email within 60s of the cron tick
+              - test asserts the email contains deeplinks to every platform where the question is matched
+              - test asserts no duplicate alert fires until the spread drops below threshold and re-crosses (hysteresis rule documented in story)
+              - tests fail before implementation
+          - id: task-alerts-impl
+            title: Implement alert dispatcher
+            owner: backend
+            status: done
+            attempts: 1
+            artifacts:
+              - db/schema.ts
+              - drizzle/0004_alerts.sql
+              - lib/alerts.ts
+              - lib/alerts/template.ts
+              - tests/server/matching-setup.ts
+              - vitest.workspace.ts
+            definitionOfDone:
+              - alert tests pass
+              - email template rendered from a versioned template file
+              - template includes the required disclaimer
+
+      - id: story-disclaimer-everywhere
+        title: Mandatory disclaimer on every spread view
+        status: done
+        description: Disclaimer enforcement across all routes/templates that render a spread value (UI + email).
+        priority: P0
+        tasks:
+          - id: task-disclaimer-test
+            title: Failing test enumerating spread views + disclaimer presence
+            owner: qa
+            status: done
+            attempts: 1
+            artifacts:
+              - tests/disclaimer/disclaimer.spec.ts
+            notes: "7/7 tests pass since the existing implementation (DashboardClient + lib/alerts/template.ts) already satisfies the contract. Tests are the registry; they fail if any new spread-bearing route or .tsx omits the disclaimer."
+            definitionOfDone:
+              - tests/disclaimer.spec.* enumerates every route and email template that renders a spread value
+              - each enumerated surface asserts presence of the disclaimer string
+              - test fails before disclaimer is wired into emails + every UI surface
+
+  # ----- Phase 2 epics (fleshed out at phase open) -----
+
+  - id: epic-multiuser-isolation
+    phase: phase-2-v1.5
+    title: Multi-user signup + isolation hardening
+    description: >
+      Phase 1 supported a single fixture user via seed. Phase 2 lets real
+      humans sign up via magic link, builds explicit cross-user isolation
+      tests, and applies the test-route gating follow-up from Sprint 4 retro.
+    stories:
+      - id: story-multiuser-isolation-tests
+        title: Cross-user isolation hardening + signup polish
+        status: todo
+        priority: P0
+        description: >
+          End-to-end tests asserting two concurrent users can't see each
+          other's watched questions, spreads, alerts, or anakin keys. Sign-in
+          polish so a brand-new email gets a real account row created on first
+          magic-link click (today the fixture user is the only seeded path).
+        tasks:
+          - id: task-multiuser-test
+            title: Failing tests for two-user concurrent isolation
+            owner: qa
+            status: done
+            attempts: 1
+            artifacts:
+              - tests/multiuser/isolation.test.ts
+              - tests/seeds/queries.yaml
+              - vitest.workspace.ts
+            definitionOfDone:
+              - tests/multiuser/isolation.test.ts seeds 2 users with independent keys, questions, snapshots, alerts
+              - tests assert user A's GET/POST/DELETE on every API surface returns only A's data
+              - tests assert cron + alerts dispatch processes each user's data independently
+              - tests assert email alerts are sent to the correct recipient per user
+              - tests fail pre-implementation (today only one fixture user is seeded)
+          - id: task-multiuser-signup
+            title: Real-user signup via magic link creates a user row
+            owner: backend
+            status: done
+            attempts: 1
+            notes: "15/15 multiuser tests pass + 162 regression tests pass; NextAuth newUser pages config added; auth callback raw-token rewriting in test harness."
+            artifacts:
+              - auth.ts
+              - vitest.workspace.ts
+              - tests/server/watched-server-setup.ts
+            definitionOfDone:
+              - NextAuth Drizzle adapter creates a fresh users row on first magic-link from an unknown email
+              - new user lands on onboarding/anakin-key (status=key-missing)
+              - test asserts a brand-new email completes the full flow and reaches dashboard
+          - id: task-test-route-gating
+            title: Replace NODE_ENV==test guard on test-only routes with ENABLE_TEST_ROUTES env (Sprint 4 retro)
+            owner: backend
+            status: done
+            attempts: 1
+            artifacts:
+              - app/api/test-seed-spreads/route.ts
+              - app/api/test-set-key-status/route.ts
+              - .env.example
+              - vitest.workspace.ts
+              - playwright.config.ts
+            definitionOfDone:
+              - app/api/test-seed-spreads + app/api/test-set-key-status check ENABLE_TEST_ROUTES=true
+              - .env.example documents the var with "test only — never set in staging/prod"
+              - test-runner env sets the var; existing tests still pass; production access returns 404
+
+  - id: epic-custom-thresholds
+    phase: phase-2-v1.5
+    title: Per-question custom thresholds
+    description: >
+      Phase 1 had a global 3% threshold. Phase 2 lets a user set a per-question
+      override; the cron + alerts state machine reads the per-question value
+      when present, falling back to the global default.
+    stories:
+      - id: story-custom-thresholds
+        title: Per-question threshold override end-to-end
+        status: todo
+        priority: P0
+        description: Schema column + API + UI control + cron/alerts integration.
+        tasks:
+          - id: task-thresholds-test
+            title: Failing tests for per-question threshold override
+            owner: qa
+            status: done
+            attempts: 1
+            artifacts:
+              - tests/thresholds/thresholds.test.ts
+            definitionOfDone:
+              - tests assert cron + alerts read watched_questions.threshold when not null, else SPREAD_THRESHOLD
+              - tests assert a per-question 0.04 threshold suppresses alerts at 0.035 (which would fire under the global 0.03)
+              - tests assert a per-question 0.02 threshold fires alerts at 0.025
+              - UI test: per-question threshold input on dashboard accepts 0.5-10%, persists, and reflects in the next cron tick
+          - id: task-thresholds-backend
+            title: Schema + API + cron/alerts integration
+            owner: backend
+            status: done
+            attempts: 1
+            notes: "18/18 thresholds + 21/21 alerts + 48/48 cron = 87/87; PATCH /api/watched/:id endpoint; question.threshold ?? SPREAD_THRESHOLD read fresh per tick."
+            artifacts:
+              - db/schema.ts
+              - drizzle/0006_watched_questions_threshold.sql
+              - lib/alerts.ts
+              - app/api/watched/[id]/route.ts
+              - tests/server/threshold-server-setup.ts
+            definitionOfDone:
+              - watched_questions.threshold real nullable column (Drizzle migration)
+              - PATCH /api/watched/:id accepts { threshold } with validation (0.005-0.10 range)
+              - lib/alerts.ts:evaluateAndDispatch reads question.threshold ?? SPREAD_THRESHOLD
+              - threshold tests pass; no regression on the 21 Phase-1 alert tests
+          - id: task-thresholds-frontend
+            title: UI control for per-question threshold
+            owner: frontend
+            status: done
+            attempts: 1
+            definitionOfDone:
+              - WatchedSection row has an inline "Alert at: X%" control per UX spec (designer to be dispatched first if no spec exists)
+              - PATCH /api/watched/:id wired
+              - empty state of the control falls back to "Alert at: 3% (default)"
+
+  - id: epic-spread-history-chart
+    phase: phase-2-v1.5
+    title: 7-day spread history chart
+    description: >
+      Phase 1 wrote spread_snapshots as upserts (one row per question). Phase 2
+      keeps history: append-only spread_history table, then a small per-row
+      chart on the dashboard rendering the last 7 days.
+    stories:
+      - id: story-spread-history
+        title: Append-only spread history + per-row chart
+        status: todo
+        priority: P0
+        description: Schema + cron append + chart UI.
+        tasks:
+          - id: task-history-test
+            title: Failing tests for append-only history + chart rendering
+            owner: qa
+            status: done
+            attempts: 1
+            artifacts:
+              - tests/history/history.test.ts
+              - tests/history/dashboard-sparkline.spec.ts
+            definitionOfDone:
+              - tests assert cron appends to spread_history every tick (not upserts)
+              - tests assert spread_history retention is bounded (e.g. 8 days, configurable) — old rows pruned
+              - Playwright tests assert each watched-question row renders an SVG/canvas sparkline of the last 7 days
+              - tests assert chart aria-label includes the min/max spread observed in the window
+          - id: task-history-backend
+            title: spread_history table + cron append + retention
+            owner: backend
+            status: done
+            attempts: 1
+            definitionOfDone:
+              - new spread_history table (question_id fk, spread real nullable, computed_at timestamp); ON DELETE CASCADE
+              - cron writes both spread_snapshots (upsert, current) and spread_history (insert, append)
+              - retention job (extra cron route or piggyback on refresh-spreads) prunes rows older than 8 days
+              - history tests pass; no regression on cron/alerts/dashboard
+          - id: task-history-frontend
+            title: 7-day sparkline per dashboard row
+            owner: frontend
+            status: done
+            attempts: 1
+            definitionOfDone:
+              - SVG/inline sparkline component reading from a new /api/watched/:id/history endpoint
+              - rendered between the spread cell and the deeplinks (or wherever the UX spec puts it)
+              - WCAG-compliant aria-label describing the trend
+
+  - id: epic-web-push
+    phase: phase-2-v1.5
+    title: Web-push notifications (parallel transport to email)
+    description: >
+      Add a web-push transport to the alert dispatcher. User opts in via a
+      browser permission prompt; subscription persisted; alerts fan out to
+      email AND any active subscriptions. Reuses the Phase-1 hysteresis state machine.
+    stories:
+      - id: story-web-push
+        title: Web-push subscription + alert transport
+        status: todo
+        priority: P1
+        description: Service worker + subscription API + transport swap in lib/alerts.ts.
+        tasks:
+          - id: task-web-push-test
+            title: Failing tests for web-push subscription + delivery
+            owner: qa
+            status: done
+            attempts: 1
+            definitionOfDone:
+              - tests assert POST /api/me/push-subscriptions persists a subscription
+              - tests assert a threshold-cross event triggers a web-push send via web-push npm pkg (mocked)
+              - tests assert hysteresis from Phase 1 still holds across the dual-transport dispatch (no duplicate fires for the same cross)
+              - tests assert subscription removal disables web-push for that user
+          - id: task-web-push-backend
+            title: Subscription endpoints + service worker + dispatcher swap
+            owner: backend
+            status: done
+            attempts: 1
+            definitionOfDone:
+              - VAPID keys configured via env
+              - /api/me/push-subscriptions POST/DELETE
+              - public/sw.js minimal service worker (push event → notification)
+              - lib/alerts.ts fans out to both email and active push subscriptions
+              - all 21 Phase-1 alert tests still pass
+          - id: task-web-push-frontend
+            title: Permission prompt + subscription toggle
+            owner: frontend
+            status: done
+            attempts: 1
+            definitionOfDone:
+              - settings page has a "Enable push alerts" toggle
+              - on enable, browser permission prompt fires; on accept, subscription persisted
+              - toggle reflects current subscription state on page load
+
+  - id: epic-embedding-matching
+    phase: phase-2-v1.5
+    title: Embedding-based cross-platform matching
+    description: >
+      Phase 1's matcher uses free-text substring matching via Wire's search.
+      Phase 2 generates an embedding for each query + market title, then
+      picks the nearest market per platform. Goal: ≥80% accuracy on a seeded eval set.
+    stories:
+      - id: story-embedding-matching
+        title: Embedding pipeline + eval harness
+        status: done
+        priority: P1
+        description: Embedding provider (OpenAI or Anakin Wire if available), embedding column, cosine match, eval against a seeded ground-truth set.
+        tasks:
+          - id: task-embedding-test
+            title: Failing tests for embedding matcher + eval ≥80%
+            owner: qa
+            status: done
+            attempts: 1
+            definitionOfDone:
+              - tests/seeds/embedding-eval.yaml has ≥20 queries with ground-truth per-platform market IDs
+              - tests assert embedding matcher achieves ≥80% accuracy on the eval set
+              - tests assert the matcher falls back to Phase-1 free-text matching on provider failure
+              - tests use a fixture-mode embedding provider (record-and-replay like Wire fixtures)
+          - id: task-embedding-architect-adr
+            title: ADR for embedding provider + storage shape
+            owner: architect
+            status: done
+            attempts: 1
+            definitionOfDone:
+              - docs/architecture/0003-embedding-matching.md exists
+              - covers provider choice (OpenAI text-embedding-3-small vs Anakin Wire vs sentence-transformers self-hosted), embedding dim, storage (sqlite blob vs Neon pgvector), cosine retrieval algorithm, fallback semantics, cost projection at MVP scale
+          - id: task-embedding-impl
+            title: Embedding pipeline + nearest-platform-market retrieval
+            owner: backend
+            status: done
+            attempts: 1
+            definitionOfDone:
+              - lib/matching/embeddings.ts implements the ADR-pinned pipeline
+              - watched_questions.embedding column added; question_matches gets a match_score column
+              - POST /api/watched uses the embedding matcher when an embedding provider is configured; falls back to Phase-1 matcher otherwise
+              - embedding eval tests pass with ≥80% accuracy
+
+  # ----- Phase 3 epics (fleshed out at phase open) -----
+
+  - id: epic-billing-stripe
+    phase: phase-3-v2
+    title: Stripe subscription billing
+    description: >
+      Add Stripe Checkout (hosted page) for a $19/mo paid plan. Schema gains
+      plan and stripe_customer_id columns on users. A webhook endpoint handles
+      the three lifecycle events: checkout completion, subscription deletion,
+      and payment failure. No trial period for MVP — user pays immediately.
+      Billing is strictly for product features; Wire credits are never subsidised.
+    stories:
+      - id: story-billing-schema
+        title: Users table — plan + stripe_customer_id columns
+        status: todo
+        priority: P0
+        description: >
+          Add plan TEXT NOT NULL DEFAULT 'free' and stripe_customer_id TEXT
+          nullable to users table via a Drizzle migration. Plan enum: free | paid.
+          No API surface in this story — just schema and migration.
+        tasks:
+          - id: task-billing-schema-test
+            title: Failing tests for plan column presence and default
+            owner: qa
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - tests/billing/schema.test.ts asserts new users get plan='free' by default
+              - tests assert stripe_customer_id is nullable on a fresh user row
+              - tests assert plan is constrained to 'free' | 'paid' (CHECK constraint)
+              - tests fail before migration is applied
+          - id: task-billing-schema-impl
+            title: Drizzle migration — plan + stripe_customer_id on users
+            owner: backend
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - db/schema.ts adds plan text column (enum free|paid, NOT NULL, DEFAULT 'free') with CHECK constraint
+              - db/schema.ts adds stripe_customer_id text column (nullable)
+              - drizzle migration file exists and applies cleanly on fresh SQLite
+              - schema tests pass; no regression on existing tests
+
+      - id: story-stripe-checkout
+        title: Stripe Checkout session + upgrade flow
+        status: todo
+        priority: P0
+        description: >
+          POST /api/billing/checkout creates a Stripe Checkout session for the
+          paid price ID and redirects the user to Stripe's hosted page.
+          On success, Stripe redirects back to /dashboard?upgrade=success.
+          On cancel, redirects to /dashboard?upgrade=cancelled.
+        tasks:
+          - id: task-billing-checkout-test
+            title: Failing tests for checkout session creation
+            owner: qa
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - tests mock Stripe SDK; assert POST /api/billing/checkout returns a redirect to a Stripe URL
+              - tests assert checkout session includes correct price_id (STRIPE_PAID_PRICE_ID env)
+              - tests assert unauthenticated requests return 401
+              - tests assert already-paid users receive a 409 (already subscribed)
+          - id: task-billing-checkout-impl
+            title: POST /api/billing/checkout endpoint
+            owner: backend
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - app/api/billing/checkout/route.ts reads auth session, calls stripe.checkout.sessions.create
+              - session mode=subscription, success_url and cancel_url set to /dashboard with query params
+              - STRIPE_SECRET_KEY and STRIPE_PAID_PRICE_ID read from env; startup fails if absent in non-test env
+              - .env.example documents STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PAID_PRICE_ID
+
+      - id: story-stripe-webhook
+        title: Stripe webhook — plan lifecycle
+        status: todo
+        priority: P0
+        description: >
+          POST /api/webhooks/stripe handles checkout.session.completed (flip plan
+          to paid, store stripe_customer_id), customer.subscription.deleted (flip
+          plan back to free), and invoice.payment_failed (surface error to user,
+          do not immediately downgrade — grace period of one failed invoice).
+        tasks:
+          - id: task-billing-webhook-test
+            title: Failing tests for Stripe webhook event handling
+            owner: qa
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - tests/billing/webhook.test.ts constructs raw Stripe event payloads and POST them to the route
+              - tests assert checkout.session.completed sets users.plan='paid' and stores stripe_customer_id
+              - tests assert customer.subscription.deleted sets users.plan='free'
+              - tests assert invoice.payment_failed does NOT immediately downgrade (plan stays 'paid')
+              - tests assert requests with invalid Stripe signatures return 400
+          - id: task-billing-webhook-impl
+            title: POST /api/webhooks/stripe endpoint
+            owner: backend
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - app/api/webhooks/stripe/route.ts verifies Stripe-Signature header with STRIPE_WEBHOOK_SECRET
+              - checkout.session.completed handler updates users.plan='paid' and users.stripe_customer_id
+              - customer.subscription.deleted handler updates users.plan='free'
+              - invoice.payment_failed handler records failure without immediate downgrade
+              - route is excluded from NextAuth session middleware (public endpoint)
+              - webhook tests pass; no regression on existing auth/api tests
+
+      - id: story-billing-ui
+        title: Upgrade CTA + billing portal link
+        status: todo
+        priority: P1
+        description: >
+          Settings page shows current plan, an "Upgrade to Paid ($19/mo)" button
+          that POSTs to /api/billing/checkout, and a "Manage subscription" link
+          to the Stripe customer portal for paid users.
+        tasks:
+          - id: task-billing-ui-test
+            title: Failing Playwright tests for upgrade CTA and plan badge
+            owner: qa
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - Playwright test asserts free-plan user sees upgrade CTA on settings page
+              - Playwright test asserts paid-plan user sees "Paid" badge and "Manage subscription" link
+              - Playwright test asserts clicking upgrade CTA triggers POST /api/billing/checkout (mocked redirect)
+          - id: task-billing-ui-impl
+            title: Settings page — plan status + upgrade/manage UI
+            owner: frontend
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - /app/settings page renders current plan from GET /api/me (add plan field to response)
+              - "Upgrade" button present and functional for free users
+              - "Manage subscription" link (Stripe portal) present for paid users
+              - /dashboard shows upgrade nudge when free user hits the 5-question cap
+
+  - id: epic-sso-google
+    phase: phase-3-v2
+    title: Google SSO alongside email magic-link
+    description: >
+      Add GoogleProvider to NextAuth v5 config. Same-email accounts are linked
+      automatically via the existing NextAuth accounts table (no schema change
+      needed). Env vars GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required.
+    stories:
+      - id: story-sso-google
+        title: Google SSO sign-in + account linking
+        status: todo
+        priority: P0
+        description: >
+          Configure GoogleProvider in auth.ts next to the existing Email provider.
+          Account linking: if a user signs in with Google using an email that
+          already has a magic-link account, NextAuth links them via the accounts
+          table — the user lands on their existing dashboard, not a new account.
+        tasks:
+          - id: task-sso-test
+            title: Failing tests for Google SSO sign-in and account linking
+            owner: qa
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - tests/sso/google.test.ts mocks NextAuth Google callback and asserts a new user row is created on first Google login
+              - tests assert a second Google login for the same email reuses the existing user row (no duplicate)
+              - tests assert a user who previously used magic-link can also sign in via Google (linked account)
+              - tests assert GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET absent causes a startup warning (not crash in dev)
+              - tests fail before GoogleProvider is wired in
+          - id: task-sso-impl
+            title: GoogleProvider in NextAuth config + env wiring
+            owner: backend
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - auth.ts adds GoogleProvider({ clientId, clientSecret }) alongside Email provider
+              - GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET read from env; .env.example documents them
+              - NextAuth allowDangerousEmailAccountLinking enabled (or adapter-level linking verified) so same-email = same user
+              - Google OAuth redirect URI documented in .env.example (format: {origin}/api/auth/callback/google)
+              - SSO tests pass; no regression on magic-link auth tests
+          - id: task-sso-ui
+            title: "Continue with Google" button on sign-in page
+            owner: frontend
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - sign-in page renders a "Continue with Google" button below the magic-link form
+              - button calls signIn('google') from next-auth/react
+              - button is visually distinct from the email CTA (Google brand colours or icon per Google guidelines)
+
+  - id: epic-plan-limits
+    phase: phase-3-v2
+    title: Plan-gated feature enforcement
+    description: >
+      Free plan enforces the existing 5-question cap. Paid plan removes it.
+      Downgrade flow: if a user has >5 active questions when downgraded, the
+      oldest beyond 5 become inactive (not deleted), and are restored on
+      re-upgrade. Custom rules (epic-rule-engine) are also gated to paid.
+    stories:
+      - id: story-plan-enforcement
+        title: Cap enforcement + downgrade/restore logic
+        status: todo
+        priority: P0
+        description: >
+          API layer reads users.plan and enforces QUESTION_CAP=5 for free users.
+          On downgrade (plan flips free), a job marks questions beyond the cap
+          as inactive=true (new column on watched_questions). On re-upgrade, those
+          rows are restored. No data is ever deleted during a plan change.
+        tasks:
+          - id: task-plan-limits-test
+            title: Failing tests for cap enforcement + downgrade/restore
+            owner: qa
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - tests assert free-plan POST /api/watched returns 403 when user already has 5 questions
+              - tests assert paid-plan POST /api/watched succeeds beyond 5 questions
+              - tests assert downgrade marks questions 6+ as inactive (sorted by created_at ASC — oldest kept active)
+              - tests assert re-upgrade restores previously-inactive questions
+              - tests assert GET /api/watched excludes inactive questions for both plan tiers
+              - tests fail before plan enforcement is implemented
+          - id: task-plan-limits-schema
+            title: watched_questions.inactive column migration
+            owner: backend
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - db/schema.ts adds inactive INTEGER NOT NULL DEFAULT 0 (boolean) to watched_questions
+              - Drizzle migration applies cleanly; existing rows default to inactive=0
+              - no data loss path exists — inactive rows remain in DB with all associated history/matches
+          - id: task-plan-limits-impl
+            title: Cap check in POST /api/watched + downgrade/restore handler
+            owner: backend
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - app/api/watched/route.ts reads users.plan; if free and active question count >=5, returns 403 with code PLAN_CAP_REACHED
+              - lib/billing/downgrade.ts exports downgradeUser(userId) — marks questions beyond cap 5 inactive (oldest first)
+              - lib/billing/downgrade.ts exports restoreUser(userId) — sets inactive=0 on previously-inactive questions
+              - stripe webhook calls downgradeUser on subscription.deleted; calls restoreUser on checkout.session.completed
+              - plan limits tests pass; no regression on watched/cron/alerts tests
+          - id: task-plan-limits-ui
+            title: UI feedback for cap reached + inactive question banner
+            owner: frontend
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - POST /api/watched 403 surfaces a toast "Upgrade to Paid to watch more than 5 questions"
+              - inactive questions render in dashboard with a "Paused — upgrade to restore" badge
+              - paid users see no cap messaging
+
+  - id: epic-rule-engine
+    phase: phase-3-v2
+    title: Custom rule engine (paid only)
+    description: >
+      Paid users can author per-question alert rules expressed as JSON condition
+      trees (field, op, value nodes with AND/OR combinators). Rules are stored in
+      a new rules table. After each spread computation the cron evaluates enabled
+      rules for that question and fires alerts when matched. Gated behind
+      users.plan='paid'.
+    stories:
+      - id: story-rules-schema
+        title: Rules table schema + migration
+        status: todo
+        priority: P0
+        description: >
+          New rules table: id, user_id FK, question_id FK, expression TEXT (JSON),
+          enabled INTEGER (boolean), last_fired_at INTEGER (timestamp nullable).
+          Expression format: { op: 'AND'|'OR', conditions: [{field, op, value}] }
+          where field is one of spread | kalshi_yes | polymarket_yes | manifold_yes.
+        tasks:
+          - id: task-rules-schema-test
+            title: Failing tests for rules table schema
+            owner: qa
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - tests assert rules table exists with all required columns after migration
+              - tests assert user_id FK cascades delete (rule gone when user deleted)
+              - tests assert question_id FK cascades delete (rule gone when question deleted)
+              - tests assert expression column stores and retrieves a valid JSON condition tree round-trip
+              - tests fail before migration is applied
+          - id: task-rules-schema-impl
+            title: Drizzle migration for rules table
+            owner: backend
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - db/schema.ts defines rules table with all columns and FK constraints
+              - Drizzle migration file exists and applies cleanly on fresh SQLite
+              - schema tests pass; no regression
+
+      - id: story-rules-api
+        title: CRUD API for user rules
+        status: todo
+        priority: P0
+        description: >
+          Authenticated endpoints to create, list, update, delete rules.
+          All endpoints gate on users.plan='paid' — free users receive 403.
+          Expression is validated server-side against the allowed field/op/value schema.
+        tasks:
+          - id: task-rules-api-test
+            title: Failing tests for rules CRUD endpoints
+            owner: qa
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - tests assert POST /api/rules creates a rule for a paid user and returns 201
+              - tests assert GET /api/rules returns only rules owned by the authenticated user
+              - tests assert PATCH /api/rules/:id updates enabled flag and expression
+              - tests assert DELETE /api/rules/:id removes the rule
+              - tests assert all endpoints return 403 for free-plan users
+              - tests assert POST with an invalid expression (unknown field, bad op) returns 422
+              - tests fail before endpoints are implemented
+          - id: task-rules-api-impl
+            title: Rules CRUD endpoints
+            owner: backend
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - app/api/rules/route.ts handles GET (list) and POST (create) with plan gate
+              - app/api/rules/[id]/route.ts handles PATCH and DELETE with ownership check
+              - lib/rules/validate.ts validates expression trees against allowed field/op/value schema
+              - allowed fields: spread, kalshi_yes, polymarket_yes, manifold_yes, robinhood_yes
+              - allowed ops: gt, lt, gte, lte, eq
+              - rules API tests pass; no regression
+
+      - id: story-rules-evaluator
+        title: Rule evaluator + cron integration
+        status: todo
+        priority: P0
+        description: >
+          lib/rules/evaluate.ts accepts a question's current market data and a rule
+          expression, returns boolean. After each spread computation in the cron,
+          evaluateRules(questionId, matches) runs all enabled rules for that
+          question. On match, fires an alert (email + push) and updates last_fired_at.
+          Hysteresis: same rule does not re-fire within 60 minutes.
+        tasks:
+          - id: task-rules-evaluator-test
+            title: Failing tests for rule evaluator + cron integration
+            owner: qa
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - unit tests for lib/rules/evaluate.ts cover AND/OR combinators, each field/op combination, edge cases (null field value = condition false)
+              - integration tests assert cron calls evaluateRules after spread computation
+              - tests assert a matched rule fires an alert and updates last_fired_at
+              - tests assert a rule does not re-fire if last_fired_at is within 60 minutes
+              - tests assert disabled rules are skipped
+              - tests assert rules for free-plan users are not evaluated (plan double-check in evaluator)
+          - id: task-rules-evaluator-impl
+            title: lib/rules/evaluate.ts + cron hook
+            owner: backend
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - lib/rules/evaluate.ts exports evaluateExpression(expression, context) returning boolean
+              - lib/rules/evaluate.ts exports evaluateRules(questionId, matchData) — queries enabled rules, evaluates each, fires alerts on match, updates last_fired_at
+              - app/api/cron/refresh-spreads/route.ts calls evaluateRules after computing spread for each question
+              - hysteresis: last_fired_at check prevents re-fire within 60 min
+              - rule evaluator tests pass; no regression on cron/alerts/history tests
+
+      - id: story-rules-ui
+        title: Rule builder UI (paid users only)
+        status: todo
+        priority: P1
+        description: >
+          Per-question rule builder accessible from the dashboard row. Lets paid
+          users construct a condition tree via a simple form (field dropdown, op
+          dropdown, value input, AND/OR combinator). Rule preview shows the human-
+          readable interpretation before saving.
+        tasks:
+          - id: task-rules-ui-test
+            title: Failing Playwright tests for rule builder UI
+            owner: qa
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - Playwright test asserts "Add Rule" button is visible per question row for paid users
+              - Playwright test asserts "Add Rule" button is absent (or shows upgrade prompt) for free users
+              - Playwright test asserts rule form saves a valid expression via POST /api/rules (mocked)
+              - Playwright test asserts saved rules appear in the rule list with enable/disable toggle
+          - id: task-rules-ui-impl
+            title: Rule builder component + per-question rule list
+            owner: frontend
+            status: todo
+            attempts: 0
+            definitionOfDone:
+              - RuleBuilder component renders field/op/value selects and an AND/OR combinator toggle
+              - form submission POSTs to /api/rules and shows success/error toast
+              - each question row on dashboard shows its rules with enabled toggle (PATCH /api/rules/:id)
+              - free-plan users see "Custom rules are a paid feature — upgrade" in place of the builder
+
+  # ----- Phase 4+ stubs (fleshed out when phase opens) -----
+  # phase-4-v2.5:
+  #   - epic-platform-credentials   # Kalshi REST + Polymarket wallet sig
+  #   - epic-capital-management
+  #   - epic-auto-execution-kalshi
+  #   - epic-auto-execution-polymarket
+  #   - epic-kill-switch

@@ -1,0 +1,38 @@
+{
+  "_fixture_meta": {
+    "action": "pm_get_events",
+    "query": "NFL Super Bowl LX winner",
+    "slug": "nfl-superbowl-lx",
+    "recorded": "2026-05-11T00:00:00Z",
+    "note": "Synthetic fixture — values in [0,1]; YES outcome identified by outcomes[*].name === 'Yes' per ADR-0002 §Field mapping"
+  },
+  "events": [
+    {
+      "id": "PM-NFL-SB-LX",
+      "title": "Super Bowl LX — AFC team wins?",
+      "active": true,
+      "markets": [
+        {
+          "id": "PM-MKT-NFL-SB-LX-AFC",
+          "question": "Will an AFC team win Super Bowl LX?",
+          "outcomes": [
+            {
+              "name": "Yes",
+              "bid": 0.57,
+              "ask": 0.61,
+              "last_trade_price": 0.59,
+              "price": 0.59
+            },
+            {
+              "name": "No",
+              "bid": 0.39,
+              "ask": 0.43,
+              "last_trade_price": 0.41,
+              "price": 0.41
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

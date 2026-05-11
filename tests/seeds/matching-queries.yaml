@@ -1,0 +1,51 @@
+# tests/seeds/matching-queries.yaml
+#
+# Five seeded queries for the cross-platform matching engine tests (Sprint 3).
+# These extend the 3 questions in queries.yaml for matching-specific fixtures.
+#
+# Platform coverage (fixtures recorded in tests/fixtures/wire/):
+#   fed-cuts-rates-june-2026   → all 4 platforms (kl + mm + pm + rh)
+#   presidential-election-2028 → all 4 platforms (kl + mm + pm + rh)
+#   nfl-superbowl-lx           → all 4 platforms (kl + mm + pm + rh)
+#   nyc-mayor-2025             → 2 platforms (kl + pm only)
+#   oscars-best-picture-2027   → 2 platforms (mm + pm only)
+#
+# DoD requirement: "matching finds markets across all 4 platforms for ≥3 of 5
+# seeded queries" — satisfied by the first three entries above.
+#
+# All questions belong to the primary fixture user (id from queries.yaml).
+
+fixture_user:
+  id: "00000000-0000-0000-0000-000000000001"
+  email: "fixture@predmkt-arb.test"
+
+matching_questions:
+  - id: "20000000-0000-0000-0000-000000000001"
+    query_text: "Fed cuts rates June 2026"
+    slug: "fed-cuts-rates-june-2026"
+    user_id: "00000000-0000-0000-0000-000000000001"
+    expected_platforms: ["kalshi", "manifold", "polymarket", "robinhood"]
+
+  - id: "20000000-0000-0000-0000-000000000002"
+    query_text: "Presidential election 2028 winner"
+    slug: "presidential-election-2028"
+    user_id: "00000000-0000-0000-0000-000000000001"
+    expected_platforms: ["kalshi", "manifold", "polymarket", "robinhood"]
+
+  - id: "20000000-0000-0000-0000-000000000003"
+    query_text: "NFL Super Bowl LX winner"
+    slug: "nfl-superbowl-lx"
+    user_id: "00000000-0000-0000-0000-000000000001"
+    expected_platforms: ["kalshi", "manifold", "polymarket", "robinhood"]
+
+  - id: "20000000-0000-0000-0000-000000000004"
+    query_text: "NYC mayor 2025 election"
+    slug: "nyc-mayor-2025"
+    user_id: "00000000-0000-0000-0000-000000000001"
+    expected_platforms: ["kalshi", "polymarket"]
+
+  - id: "20000000-0000-0000-0000-000000000005"
+    query_text: "Oscars best picture 2027"
+    slug: "oscars-best-picture-2027"
+    user_id: "00000000-0000-0000-0000-000000000001"
+    expected_platforms: ["manifold", "polymarket"]

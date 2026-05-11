@@ -1,0 +1,8 @@
+{
+  "_fixture_meta": {
+    "action": "pm_search_markets",
+    "slug": "__default__",
+    "note": "Empty fallback fixture — loaded when no slug-specific file exists. Matcher should produce zero Polymarket rows for this query."
+  },
+  "events": []
+}

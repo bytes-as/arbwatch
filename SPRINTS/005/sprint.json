@@ -1,0 +1,12 @@
+{
+  "sprintNumber": 5,
+  "phaseId": "phase-2-v1.5",
+  "goal": "Phase 2 sprint 1 — multi-user signup + isolation hardening, per-question custom thresholds, 7-day spread history chart. Web push + embeddings deferred to Sprint 6.",
+  "storyIds": [
+    "story-multiuser-isolation-tests",
+    "story-custom-thresholds",
+    "story-spread-history"
+  ],
+  "openedAt": "2026-05-11T07:23:53Z",
+  "closedAt": null
+}

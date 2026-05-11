@@ -1,0 +1,12 @@
+{
+  "sprintNumber": 4,
+  "phaseId": "phase-1-mvp",
+  "goal": "Close Phase 1: render spreads + deeplinks on the dashboard, ship email alerts with hysteresis + 60s SLA, and lock in the disclaimer-on-every-spread-view contract.",
+  "storyIds": [
+    "story-dashboard-impl",
+    "story-email-alerts",
+    "story-disclaimer-everywhere"
+  ],
+  "openedAt": "2026-05-11T06:27:58Z",
+  "closedAt": "2026-05-11T12:45:00Z"
+}

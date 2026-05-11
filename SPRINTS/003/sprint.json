@@ -1,0 +1,13 @@
+{
+  "sprintNumber": 3,
+  "phaseId": "phase-1-mvp",
+  "goal": "Watched-question CRUD + cross-platform matching + 5-min spread cron, bundled with the Sprint-2 security hardening follow-ups. End-of-sprint a signed-in user can add up to 5 questions, see them matched on all 4 platforms via Wire fixtures, and watch spreads update.",
+  "storyIds": [
+    "story-watched-questions-crud",
+    "story-cross-platform-matching",
+    "story-spread-cron",
+    "story-sprint-2-hardening"
+  ],
+  "openedAt": "2026-05-11T02:09:59Z",
+  "closedAt": "2026-05-11T11:30:00Z"
+}

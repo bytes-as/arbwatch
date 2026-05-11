@@ -1,0 +1,7 @@
+{
+  "_fixture_meta": {
+    "action": "rh_get_event",
+    "slug": "__default__",
+    "note": "Empty fallback fixture for rh_get_event — returns no price data so caller falls back to stored implied_yes_prob."
+  }
+}

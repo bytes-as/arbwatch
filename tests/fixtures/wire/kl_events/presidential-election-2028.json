@@ -1,0 +1,21 @@
+{
+  "_fixture_meta": {
+    "action": "kl_events",
+    "query": "Presidential election 2028 winner",
+    "slug": "presidential-election-2028",
+    "recorded": "2026-05-11T00:00:00Z",
+    "note": "Synthetic fixture — prices in cents (0-100), divide by 100 to get probability per ADR-0002 §Field mapping"
+  },
+  "markets": [
+    {
+      "market_id": "KL-PRES-2028-DEM",
+      "title": "Will a Democrat win the 2028 Presidential election?",
+      "status": "open",
+      "yes_bid": 48,
+      "yes_ask": 52,
+      "last_price": 50,
+      "volume": 890000,
+      "close_time": "2028-11-08T23:59:59Z"
+    }
+  ]
+}

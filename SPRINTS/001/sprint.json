@@ -1,0 +1,13 @@
+{
+  "sprintNumber": 1,
+  "phaseId": "phase-1-mvp",
+  "goal": "Lay foundations: stack ADR, Wire-integration ADR, onboarding UX, dashboard UX — the decisions and specs that unblock all subsequent Phase 1 work.",
+  "storyIds": [
+    "story-stack-decision",
+    "story-wire-integration-adr",
+    "story-onboarding-design",
+    "story-dashboard-design"
+  ],
+  "openedAt": "2026-05-10T19:56:43Z",
+  "closedAt": "2026-05-10T20:05:00Z"
+}

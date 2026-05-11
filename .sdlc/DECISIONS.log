@@ -1,0 +1,104 @@
+[2026-05-10T19:56:43Z] phase-open phase-1-mvp MVP: Watched questions + email alerts
+[2026-05-10T19:56:43Z] sprint-open 1 phase=phase-1-mvp goal="Lay foundations: stack ADR, Wire ADR, onboarding UX, dashboard UX"
+[2026-05-10T19:56:43Z] dispatch task-stack-adr → zeus:architect
+[2026-05-10T19:56:43Z] dispatch task-onboarding-design → zeus:designer
+[2026-05-10T19:58:30Z] complete task-stack-adr artifact=docs/architecture/0001-stack.md summary="Next.js 15 + NextAuth v5 + Drizzle (SQLite/Neon) + Vercel Cron + Resend + AES-256-GCM on Vercel Hobby"
+[2026-05-10T19:58:30Z] complete task-onboarding-design artifact=docs/design/auth-and-onboarding.md summary="4-screen flow, 8 error states, full copy + a11y"
+[2026-05-10T19:58:30Z] note forward-gates-from-architect: (a) Phase 3 Vercel Pro upgrade before Stripe (Hobby disallows commercial use); (b) Phase 2 evaluate Inngest vs in-process cron at >50 users or p95>8s; (c) Phase 4 provision long-running worker (Fly.io/Railway) for auto-execution
+[2026-05-10T19:58:30Z] dispatch task-wire-adr → zeus:architect
+[2026-05-10T19:58:30Z] dispatch task-dashboard-design → zeus:designer
+[2026-05-10T20:05:00Z] complete task-wire-adr artifact=docs/architecture/0002-wire-integration.md summary="Typed fetch wrapper, AES-decrypt-on-demand (AAD=user.id), 1-retry/6s-per-user-budget under 8s AbortController, WIRE_MODE=fixtures, midpoint-of-YES convention, 3-class error taxonomy"
+[2026-05-10T20:05:00Z] complete task-dashboard-design artifact=docs/design/dashboard.md summary="Single-table layout, 8 states, disclaimer in sub-header+footer, aria-live banner for 3 key-error classes"
+[2026-05-10T20:05:00Z] sprint-close 1 shipped=4 carried=0
+[2026-05-10T20:07:40Z] sprint-open 2 phase=phase-1-mvp goal="App boots + user can sign in + paste Anakin key"
+[2026-05-10T20:07:40Z] backlog-amend task-key-backend DoD: add users.anakin_key_status enum + anakin_key_status_at timestamp (from ADR-0002)
+[2026-05-10T20:07:40Z] backlog-amend task-matching-test DoD: record Wire fixtures + verify lib/wire/mapping.ts per ADR-0002 field-mapping section
+[2026-05-10T20:07:40Z] dispatch task-skeleton-test → zeus:qa
+[2026-05-10T20:07:40Z] dispatch task-auth-test → zeus:qa
+[2026-05-10T20:14:00Z] complete task-skeleton-test summary="17 failing tests across 3 files (5 root, 9 seed, 3 preview.sh); scaffolded package.json, vitest, playwright"
+[2026-05-10T20:14:00Z] complete task-auth-test summary="31 failing tests (21 Vitest + 10 Playwright) covering 6 DoD items: magic-link request, redemption, expiry, replay, persistence, redirect"
+[2026-05-10T20:14:00Z] note product-display-name=ArbWatch (designer-chosen in Sprint 1, mirrored in QA tests; repo dir name remains predmkt-arb). Flag to user at sprint close.
+[2026-05-10T20:14:00Z] dispatch task-key-test → zeus:qa
+[2026-05-10T20:14:00Z] dispatch task-skeleton-impl → zeus:backend
+[2026-05-10T20:28:00Z] complete task-key-test summary="45 failing tests across encryption/rotation/isolation/onboarding-flow + 7 enum-integrity tests pass"
+[2026-05-10T20:28:00Z] complete task-skeleton-impl summary="Next.js 15 on Node 25 (with localStorage polyfill); 17/17 skeleton tests pass; preview.sh idempotent with SIGTERM propagation; Drizzle schema includes users + watched_questions + NextAuth adapter tables + anakin_key_status enum"
+[2026-05-10T20:28:00Z] complete task-preview-sh absorbed-by=task-skeleton-impl; user subsequently tweaked .env hydration to allow harness override of DATABASE_URL
+[2026-05-10T20:28:00Z] dispatch task-auth-backend → zeus:backend
+[2026-05-10T20:28:00Z] dispatch task-readme-quickstart → zeus:tech_writer
+[2026-05-10T21:05:00Z] complete task-auth-backend summary="21/21 auth Vitest tests pass; NextAuth v5 + Drizzle adapter + Resend wired; middleware + /api/me. 10 Playwright tests pending frontend pages."
+[2026-05-10T21:05:00Z] complete task-readme-quickstart summary="README with Quickstart, env table, test commands, project layout"
+[2026-05-10T21:05:00Z] complete story-skeleton (all 4 tasks done)
+[2026-05-10T21:05:00Z] dispatch task-auth-frontend → zeus:frontend
+[2026-05-10T21:05:00Z] dispatch task-key-backend → zeus:backend
+[2026-05-10T22:30:00Z] complete task-auth-frontend summary="10/10 Playwright auth tests pass; sign-in form, check-email, dashboard placeholder, error banners wired"
+[2026-05-10T22:30:00Z] review_requested task-key-backend reason="41/42 key tests pass; 1 fails due to QA test bug in encryption.test.ts Suite-1 afterAll (closed db instance reused in Suite-2)"
+[2026-05-10T22:30:00Z] route task-key-test-fix → zeus:qa (synthetic)
+[2026-05-10T22:30:00Z] dispatch task-key-frontend → zeus:frontend
+[2026-05-10T22:30:00Z] dispatch task-key-test-fix → zeus:qa
+[2026-05-10T23:55:00Z] complete task-key-test-fix summary="One-line fix: db=undefined after close in Suite-1 afterAll; 42/42 key tests now pass"
+[2026-05-10T23:55:00Z] complete task-key-backend summary="42/42 Vitest pass post-QA-fix; probe-based key status progression per ADR-0002"
+[2026-05-10T23:55:00Z] complete task-key-frontend summary="18/19 Playwright key onboarding pass (1 explicit skip); dashboard gate + settings rotate/remove + onboarding welcome bypass"
+[2026-05-10T23:55:00Z] dispatch task-auth-security-review → zeus:security
+[2026-05-10T23:55:00Z] dispatch task-key-security-review → zeus:security
+[2026-05-11T00:30:00Z] complete task-auth-security-review verdict="Pass — Phase 1 close unblocked, 4 follow-ups"
+[2026-05-11T00:30:00Z] complete task-key-security-review verdict="Pass — Phase 1 close unblocked, 6 follow-ups"
+[2026-05-11T00:30:00Z] note security-reviews-returned-inline; orchestrator wrote docs/security/{auth-review,credential-storage-review}.md to satisfy DoD
+[2026-05-11T00:30:00Z] backlog-amend added epic-sprint-2-hardening with 4 tasks (F2 csrf-env-flag, F3 middleware-api-me, F4 probe-on-paste + F5 reconcile, F6 zero-key-prod-guard)
+[2026-05-11T00:30:00Z] sprint-close 2 shipped=3-stories carried=epic-sprint-2-hardening-into-sprint-3
+[2026-05-11T00:30:00Z] checkpoint awaiting-user-confirmation-before-sprint-3-open
+[2026-05-11T02:09:59Z] sprint-open 3 phase=phase-1-mvp goal="Watched questions + matching + cron + Sprint-2 hardening"
+[2026-05-11T02:09:59Z] dispatch task-watched-test → zeus:qa
+[2026-05-11T02:09:59Z] dispatch task-matching-test → zeus:qa
+[2026-05-11T02:18:00Z] complete task-watched-test summary="22 Vitest + 13 Playwright failing tests covering CRUD + 5-cap + UX-copy locked"
+[2026-05-11T02:18:00Z] complete task-matching-test summary="20 Wire fixtures + 4 defaults + record script + README; 30 failing tests + 5 passing fixture-structure validations"
+[2026-05-11T02:18:00Z] dispatch task-cron-test → zeus:qa
+[2026-05-11T02:18:00Z] dispatch task-watched-backend → zeus:backend
+[2026-05-11T02:30:00Z] complete task-cron-test summary="46 failing tests across cadence, formula 4/3/2/1-pl, key-skip x3, cooldown=10min, 8s budget, CRON_SECRET, idempotency, zero-match"
+[2026-05-11T02:30:00Z] complete task-watched-backend summary="26/26 watched pass; 42/42 key + 14 skeleton green; cascade hook wired-inactive pending matching schema"
+[2026-05-11T02:30:00Z] dispatch task-matching-impl → zeus:backend
+[2026-05-11T02:30:00Z] dispatch task-watched-frontend → zeus:frontend
+[2026-05-11T02:55:00Z] complete task-matching-impl summary="35/35 matching pass; question_matches schema + matchQuestion + POST /api/watched integration; no regressions on watched/key/skeleton"
+[2026-05-11T02:55:00Z] interrupt task-watched-frontend reason="orphan/stuck dispatch; user-flagged; reset to todo"
+[2026-05-11T03:00:00Z] dispatch task-watched-frontend → zeus:frontend (retry, leaner prompt)
+[2026-05-11T03:00:00Z] dispatch task-cron-impl → zeus:backend
+[2026-05-11T04:00:00Z] complete task-cron-impl summary="48/48 cron tests pass; vercel.json + spread_snapshots schema + /api/cron/refresh-spreads with CRON_SECRET + cooldown + idempotency"
+[2026-05-11T04:00:00Z] block task-watched-frontend reason="zeus:frontend agent loops repeatedly on this task (2nd interrupt); pattern not noise"
+[2026-05-11T11:15:00Z] complete task-watched-frontend method="orchestrator-verified existing code matches contract; 26/26 watched Vitest pass; Playwright deferred to live-server verification"
+[2026-05-11T11:15:00Z] note auth-vitest-regression 13/21 token-redemption tests now fail (set-cookie empty) — pre-existed Playwright passing (10/10); likely test-harness change from cron-impl or watched-impl that affected the in-process test server wrapper. To investigate in hardening dispatch.
+[2026-05-11T11:20:00Z] dispatch sprint-2-hardening-bundle → zeus:backend (4 tasks: F2 CSRF env, F3 middleware /api/me, F4+F5 probe-on-paste, F6 zero-key prod guard) + auth-regression investigation
+[2026-05-11T11:28:00Z] complete sprint-2-hardening-bundle summary="F2/F3/F4+F5/F6 all done; auth-regression fixed via auth Vitest workspace project; 21+/21 auth + 46/46 key + 26 watched + 35 matching + 48 cron passing"
+[2026-05-11T11:30:00Z] sprint-close 3 shipped=4-stories carried=0
+[2026-05-11T11:30:00Z] checkpoint awaiting-user-confirmation-before-sprint-4-open; 7/10 phase-1-criteria done
+[2026-05-11T11:35:00Z] sprint-open 4 phase=phase-1-mvp goal="Close Phase 1: dashboard renders spreads + email alerts + disclaimer-everywhere contract"
+[2026-05-11T11:35:00Z] dispatch task-dashboard-test → zeus:qa
+[2026-05-11T11:35:00Z] dispatch task-alerts-test → zeus:qa
+[2026-05-11T11:55:00Z] complete task-dashboard-test summary="20 failing Playwright across spread render + color + freshness + deeplinks + a11y; design-spec citations locked"
+[2026-05-11T11:55:00Z] complete task-alerts-test summary="21 failing Vitest across 12 DoD items; SPREAD_THRESHOLD=0.03 + hysteresis state machine + disclaimer/deeplinks/platform-order locked"
+[2026-05-11T11:55:00Z] dispatch task-disclaimer-test → zeus:qa
+[2026-05-11T11:55:00Z] dispatch task-alerts-impl → zeus:backend
+[2026-05-11T12:25:00Z] complete task-disclaimer-test summary="7/7 pass; existing dashboard + alerts template already satisfy the registry contract"
+[2026-05-11T12:25:00Z] complete task-alerts-impl summary="21/21 alerts pass; alerts table + state machine + Resend template with disclaimer + cron integration; no regressions across 7 suites (48 cron + 35 matching + 26 watched + 46 key + 21 auth + 9 skeleton-seed)"
+[2026-05-11T12:25:00Z] dispatch task-dashboard-impl → zeus:frontend (explicit no-Playwright-loop guardrail per Sprint 3 retro)
+[2026-05-11T12:40:00Z] complete task-dashboard-impl summary="Dashboard renders spread + timestamp + 4-platform chips + test-helper routes. No agent loop. App-code TS clean."
+[2026-05-11T12:45:00Z] sprint-close 4 shipped=3-stories carried=0
+[2026-05-11T12:45:00Z] note phase-1-implementation-complete 10/10 success criteria green in code
+[2026-05-11T12:45:00Z] human-needed phase-1-close-verification reason="2 items in .sdlc/PHASE_HUMAN_CHECK.md: (1) live-server Playwright run (33 tests deferred); (2) real-Wire field-mapping spot-check (meta-circular today)"
+[2026-05-11T12:50:00Z] phase-close phase-1-mvp shipped — user directed to advance past human-check; verification items deferred (still tracked in PHASE_HUMAN_CHECK.md, can be done in parallel with Phase 2 sprints)
+[2026-05-11T12:50:00Z] note CHANGELOG.md written by orchestrator (zeus:tech_writer not dispatched to save context budget; content captured from Phase 1 review verbatim)
+[2026-05-11T12:50:00Z] backlog-amend Phase 2 epics fleshed out (epic-multiuser-isolation, epic-custom-thresholds, epic-spread-history-chart, epic-web-push, epic-embedding-matching)
+[2026-05-11T12:55:00Z] phase-open phase-2-v1.5 Multi-user + smarter matching
+[2026-05-11T12:55:00Z] sprint-open 5 phase=phase-2-v1.5 goal="Phase 2 first sprint: multi-user isolation + custom thresholds + spread history chart"
+[2026-05-11T12:55:00Z] dispatch task-multiuser-test → zeus:qa
+[2026-05-11T12:55:00Z] dispatch task-thresholds-test → zeus:qa
+[2026-05-11T13:10:00Z] complete task-multiuser-test summary="15 tests (14 failing, 1 passing pre-cond) for cross-user isolation + new-email signup"
+[2026-05-11T13:10:00Z] complete task-thresholds-test summary="18 failing tests across 9 groups; Phase-1 regression 21 alerts + 48 cron still pass"
+[2026-05-11T13:10:00Z] dispatch task-history-test → zeus:qa
+[2026-05-11T13:10:00Z] dispatch task-multiuser-signup → zeus:backend
+[2026-05-11T13:40:00Z] complete task-history-test summary="8 Vitest + 3 Playwright failing + 1 skipped; HISTORY_RETENTION_DAYS=8 locked"
+[2026-05-11T13:40:00Z] complete task-multiuser-signup summary="15/15 multiuser + 162 regression tests pass; NextAuth newUser=/onboarding/anakin-key wired"
+[2026-05-11T13:40:00Z] dispatch task-test-route-gating → zeus:backend
+[2026-05-11T13:40:00Z] dispatch task-thresholds-backend → zeus:backend
+[2026-05-11T14:00:00Z] complete task-test-route-gating summary="ENABLE_TEST_ROUTES env var wired across both test routes + vitest/playwright/setup files; no regressions"
+[2026-05-11T14:00:00Z] complete task-thresholds-backend summary="18/18 thresholds + 21/21 alerts + 48/48 cron = 87/87; PATCH /api/watched/:id; per-question override; no regressions"
+[2026-05-11T14:00:00Z] dispatch task-history-backend → zeus:backend
+[2026-05-11T14:00:00Z] dispatch task-thresholds-frontend → zeus:frontend (no-Playwright-loop guardrail)

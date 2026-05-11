@@ -1,0 +1,21 @@
+{
+  "_fixture_meta": {
+    "action": "kl_events",
+    "query": "Fed cuts rates June 2026",
+    "slug": "fed-cuts-rates-june-2026",
+    "recorded": "2026-05-11T00:00:00Z",
+    "note": "Synthetic fixture — prices in cents (0-100), divide by 100 to get probability per ADR-0002 §Field mapping"
+  },
+  "markets": [
+    {
+      "market_id": "KL-FED-CUTS-JUNE-2026",
+      "title": "Will the Fed cut rates in June 2026?",
+      "status": "open",
+      "yes_bid": 42,
+      "yes_ask": 44,
+      "last_price": 43,
+      "volume": 125000,
+      "close_time": "2026-06-30T23:59:59Z"
+    }
+  ]
+}

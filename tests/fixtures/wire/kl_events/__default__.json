@@ -1,0 +1,8 @@
+{
+  "_fixture_meta": {
+    "action": "kl_events",
+    "slug": "__default__",
+    "note": "Empty fallback fixture — loaded when no slug-specific file exists. Matcher should produce zero Kalshi rows for this query."
+  },
+  "markets": []
+}

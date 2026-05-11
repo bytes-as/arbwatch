@@ -1,0 +1,7 @@
+{
+  "_fixture_meta": {
+    "action": "mm_market_prob",
+    "slug": "__default__",
+    "note": "Empty fallback fixture for mm_market_prob — returns no price data so caller falls back to stored implied_yes_prob."
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "_fixture_meta": {
+    "action": "pm_get_events",
+    "query": "Fed cuts rates June 2026",
+    "slug": "fed-cuts-rates-june-2026",
+    "recorded": "2026-05-11T00:00:00Z",
+    "note": "Synthetic fixture — values in [0,1]; YES outcome identified by outcomes[*].name === 'Yes' per ADR-0002 §Field mapping"
+  },
+  "events": [
+    {
+      "id": "PM-FED-CUTS-JUNE-2026",
+      "title": "Will the Fed cut rates in June 2026?",
+      "active": true,
+      "markets": [
+        {
+          "id": "PM-MKT-FED-JUNE-2026-01",
+          "question": "Fed rate cut June 2026?",
+          "outcomes": [
+            {
+              "name": "Yes",
+              "bid": 0.39,
+              "ask": 0.41,
+              "last_trade_price": 0.40,
+              "price": 0.40
+            },
+            {
+              "name": "No",
+              "bid": 0.59,
+              "ask": 0.61,
+              "last_trade_price": 0.60,
+              "price": 0.60
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

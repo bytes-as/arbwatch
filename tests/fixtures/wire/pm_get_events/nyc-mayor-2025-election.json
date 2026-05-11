@@ -1,0 +1,38 @@
+{
+  "_fixture_meta": {
+    "action": "pm_get_events",
+    "query": "NYC mayor 2025 election",
+    "slug": "nyc-mayor-2025",
+    "recorded": "2026-05-11T00:00:00Z",
+    "note": "Synthetic fixture — values in [0,1]; YES outcome identified by outcomes[*].name === 'Yes' per ADR-0002 §Field mapping"
+  },
+  "events": [
+    {
+      "id": "PM-NYC-MAYOR-2025",
+      "title": "2025 NYC Mayoral Election",
+      "active": true,
+      "markets": [
+        {
+          "id": "PM-MKT-NYC-MAYOR-2025-DEM",
+          "question": "Will the Democratic candidate win the 2025 NYC mayor race?",
+          "outcomes": [
+            {
+              "name": "Yes",
+              "bid": 0.73,
+              "ask": 0.77,
+              "last_trade_price": 0.75,
+              "price": 0.75
+            },
+            {
+              "name": "No",
+              "bid": 0.23,
+              "ask": 0.27,
+              "last_trade_price": 0.25,
+              "price": 0.25
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "_fixture_meta": {
+    "action": "mm_search_markets",
+    "query": "Oscars best picture 2027",
+    "slug": "oscars-best-picture-2027",
+    "recorded": "2026-05-11T00:00:00Z",
+    "note": "Synthetic fixture — Manifold AMM: probability in [0,1], treated as bid==ask==midpoint per ADR-0002 §Field mapping"
+  },
+  "markets": [
+    {
+      "id": "MM-OSCARS-BP-2027",
+      "question": "Will [Film X] win Best Picture at the 2027 Oscars?",
+      "url": "https://manifold.markets/market/will-film-x-win-best-picture-2027-oscars",
+      "outcomeType": "BINARY",
+      "probability": 0.28,
+      "pool": {
+        "YES": 3200,
+        "NO": 8200
+      },
+      "totalLiquidity": 800,
+      "volume": 12000,
+      "isResolved": false,
+      "closeTime": 1804924799000
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+# tests/seeds/embedding-eval.yaml
+#
+# Evaluation set for the embedding-based matching pipeline (ADR-0003).
+#
+# Each entry contains:
+#   query       — the free-text question the user would type
+#   ground_truth — per-platform ground-truth market IDs
+#                  (null for platforms where no market exists)
+#
+# Accuracy target (from BACKLOG task-embedding-test DoD):
+#   ≥ 80% top-1 hit rate across all non-null ground_truth entries.
+#
+# Source: manually authored based on real Kalshi/Manifold/Polymarket markets.
+#   These IDs are representative fixtures — in WIRE_MODE=fixtures the test
+#   uses the fixture embedding responses from tests/fixtures/embeddings/.
+#   The IDs do not need to correspond to live markets.
+#
+# Format note: platform entries can be omitted rather than listed as null
+# when no market exists for that platform.
+
+eval_queries:
+  - id: 1
+    query: "Will the Federal Reserve raise interest rates in 2026?"
+    ground_truth:
+      kalshi: "FED-2026-RAISE"
+      manifold: "fed-raise-2026"
+      polymarket: "0xfed2026raise"
+      robinhood: "rh-fed-2026-raise"
+
+  - id: 2
+    query: "Will the US enter a recession by end of 2026?"
+    ground_truth:
+      kalshi: "RECESSION-2026"
+      manifold: "us-recession-2026"
+      polymarket: "0xrecession2026"
+
+  - id: 3
+    query: "Will the S&P 500 close above 6000 in Q1 2027?"
+    ground_truth:
+      kalshi: "SP500-6000-Q1-2027"
+      manifold: "sp500-6000-q1-2027"
+      polymarket: "0xsp5006000q12027"
+
+  - id: 4
+    query: "Will the 2026 US midterm elections flip the Senate to Democrats?"
+    ground_truth:
+      kalshi: "MIDTERM-SENATE-DEM-2026"
+      manifold: "senate-dem-2026"
+      polymarket: "0xsenatedem2026"
+      robinhood: "rh-senate-dem-2026"
+
+  - id: 5
+    query: "Will a major AI lab release a model surpassing GPT-4 in 2026?"
+    ground_truth:
+      kalshi: "AI-GPT4-SURPASS-2026"
+      manifold: "ai-gpt4-2026"
+      polymarket: "0xaigpt42026"
+
+  - id: 6
+    query: "Will OpenAI go public (IPO) by end of 2026?"
+    ground_truth:
+      kalshi: "OPENAI-IPO-2026"
+      manifold: "openai-ipo-2026"
+      polymarket: "0xopenaiipo2026"
+
+  - id: 7
+    query: "Will the US unemployment rate exceed 5% in 2026?"
+    ground_truth:
+      kalshi: "UNEMPLOYMENT-5PCT-2026"
+      manifold: "unemployment-5pct-2026"
+      polymarket: "0xunemploy5pct2026"
+
+  - id: 8
+    query: "Will Bitcoin exceed $150,000 in 2026?"
+    ground_truth:
+      kalshi: "BTC-150K-2026"
+      manifold: "btc-150k-2026"
+      polymarket: "0xbtc150k2026"
+      robinhood: "rh-btc-150k-2026"
+
+  - id: 9
+    query: "Will Ethereum reach $10,000 in 2026?"
+    ground_truth:
+      kalshi: "ETH-10K-2026"
+      manifold: "eth-10k-2026"
+      polymarket: "0xeth10k2026"
+
+  - id: 10
+    query: "Will SpaceX Starship successfully reach orbit in 2026?"
+    ground_truth:
+      kalshi: "SPACEX-STARSHIP-ORBIT-2026"
+      manifold: "starship-orbit-2026"
+      polymarket: "0xstarshiporbit2026"
+
+  - id: 11
+    query: "Will the EU impose new tariffs on US goods in 2026?"
+    ground_truth:
+      kalshi: "EU-US-TARIFFS-2026"
+      manifold: "eu-us-tariffs-2026"
+      polymarket: "0xeuustariffs2026"
+
+  - id: 12
+    query: "Will inflation in the US exceed 4% in 2026?"
+    ground_truth:
+      kalshi: "INFLATION-4PCT-2026"
+      manifold: "us-inflation-4pct-2026"
+      polymarket: "0xusinflation4pct2026"
+
+  - id: 13
+    query: "Will China invade Taiwan before 2027?"
+    ground_truth:
+      kalshi: "CHINA-TAIWAN-2027"
+      manifold: "china-taiwan-2027"
+      polymarket: "0xchinataiwan2027"
+      robinhood: "rh-china-taiwan-2027"
+
+  - id: 14
+    query: "Will the 2026 FIFA World Cup host country win the tournament?"
+    ground_truth:
+      kalshi: "FIFA-2026-HOST-WIN"
+      manifold: "fifa-2026-host"
+      polymarket: "0xfifa2026host"
+
+  - id: 15
+    query: "Will Apple release a foldable iPhone in 2026?"
+    ground_truth:
+      kalshi: "APPLE-FOLD-IPHONE-2026"
+      manifold: "apple-foldable-2026"
+      polymarket: "0xapplefold2026"
+
+  - id: 16
+    query: "Will the US national debt exceed $40 trillion in 2026?"
+    ground_truth:
+      kalshi: "US-DEBT-40T-2026"
+      manifold: "us-debt-40t-2026"
+      polymarket: "0xusdebt40t2026"
+
+  - id: 17
+    query: "Will a cure or major treatment for Alzheimer's be approved in 2026?"
+    ground_truth:
+      kalshi: "ALZHEIMER-CURE-2026"
+      manifold: "alzheimer-treatment-2026"
+      polymarket: "0xalzheimer2026"
+
+  - id: 18
+    query: "Will the Republican Party win the 2026 US House midterms?"
+    ground_truth:
+      kalshi: "HOUSE-GOP-2026"
+      manifold: "house-gop-2026"
+      polymarket: "0xhousegop2026"
+      robinhood: "rh-house-gop-2026"
+
+  - id: 19
+    query: "Will NVIDIA's stock price exceed $200 in 2026?"
+    ground_truth:
+      kalshi: "NVDA-200-2026"
+      manifold: "nvda-200-2026"
+      polymarket: "0xnvda2002026"
+
+  - id: 20
+    query: "Will the UK rejoin the EU single market by 2028?"
+    ground_truth:
+      kalshi: "UK-EU-2028"
+      manifold: "uk-eu-rejoin-2028"
+      polymarket: "0xukeu2028"

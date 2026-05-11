@@ -1,0 +1,68 @@
+# tests/seeds/queries.yaml
+#
+# Seed data for the 3 fixture questions required by ADR-0001 / preview.sh DoD.
+# The implementer must read this file in scripts/seed.ts and insert exactly
+# these rows into the `watched_questions` table.
+#
+# Fields:
+#   id:         stable UUID — allows idempotent upsert (ON CONFLICT DO NOTHING)
+#   query_text: the watched question text
+#   user_id:    must match the fixture user's id (see fixture_user block below)
+
+fixture_user:
+  id: "00000000-0000-0000-0000-000000000001"
+  email: "fixture@predmkt-arb.test"
+  # anakin_key_status must be "ok" so downstream auth/key tests have a valid account.
+  # The actual encrypted bytes are a deterministic dummy encrypted with the
+  # test APP_ENCRYPTION_KEY "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" (32 zero bytes, base64).
+  # The seed script must generate this by calling the AES-256-GCM encrypt helper
+  # with plaintext "fixture-anakin-key-for-testing-only".
+  anakin_key_status: "ok"
+  # created_at is inserted as the current time by the seed script.
+
+# Second fixture user: no Anakin key on file.
+# Used by tests/key/ to exercise the key-missing path without touching the
+# primary fixture user.  The seed script must insert this user alongside the
+# primary fixture user (no watched_questions rows are required for this user).
+fixture_user_no_key:
+  id: "00000000-0000-0000-0000-000000000002"
+  email: "nokey@predmkt-arb.test"
+  # anakin_key_ct must be NULL (no key stored).
+  # anakin_key_status must be "key-missing".
+  anakin_key_status: "key-missing"
+
+# Third fixture user: two-user isolation tests (multiuser suite).
+# Has its own Anakin key (plaintext: "fixture-anakin-key-user-b-testing-only").
+# Has 2 watched questions, one of which overlaps with user A ("Fed cuts rates")
+# to expose naive cross-contamination.
+fixture_user_b:
+  id: "00000000-0000-0000-0000-000000000003"
+  email: "userb@predmkt-arb.test"
+  # anakin_key_status must be "ok" so multiuser isolation tests can verify
+  # Wire calls use the correct per-user key.
+  anakin_key_status: "ok"
+
+questions:
+  - id: "10000000-0000-0000-0000-000000000001"
+    query_text: "Will the Fed raise interest rates in 2026?"
+    user_id: "00000000-0000-0000-0000-000000000001"
+
+  - id: "10000000-0000-0000-0000-000000000002"
+    query_text: "Will the US enter a recession by end of 2026?"
+    user_id: "00000000-0000-0000-0000-000000000001"
+
+  - id: "10000000-0000-0000-0000-000000000003"
+    query_text: "Will a major AI lab release a model surpassing GPT-5 in 2026?"
+    user_id: "00000000-0000-0000-0000-000000000001"
+
+# Two questions for fixture_user_b.
+# "Will the Fed raise interest rates in 2026?" is deliberately the same text as
+# user A's question so the test suite can catch naive cross-user contamination.
+questions_user_b:
+  - id: "10000000-0000-0000-0000-000000000011"
+    query_text: "Will the Fed raise interest rates in 2026?"
+    user_id: "00000000-0000-0000-0000-000000000003"
+
+  - id: "10000000-0000-0000-0000-000000000012"
+    query_text: "Will Bitcoin exceed $200k before end of 2026?"
+    user_id: "00000000-0000-0000-0000-000000000003"

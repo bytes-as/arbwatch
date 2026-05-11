@@ -1,0 +1,12 @@
+{
+  "sprintNumber": 2,
+  "phaseId": "phase-1-mvp",
+  "goal": "App boots + user can sign in via magic-link + paste an Anakin key. End-of-sprint a fresh visitor can complete the entire onboarding flow against seeded data.",
+  "storyIds": [
+    "story-skeleton",
+    "story-magic-link-auth",
+    "story-anakin-key-storage"
+  ],
+  "openedAt": "2026-05-10T20:07:40Z",
+  "closedAt": "2026-05-10T23:55:00Z"
+}

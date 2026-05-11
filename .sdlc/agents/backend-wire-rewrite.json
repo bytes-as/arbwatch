@@ -1,0 +1,37 @@
+{
+  "role": "Backend engineer",
+  "taskId": "wire-rewrite",
+  "storyId": "wire-integration-rewrite",
+  "phase": "implementation",
+  "sprint": 5,
+  "startedAt": "2026-05-11T10:47:54Z",
+  "lastTick": "2026-05-11T11:10:00Z",
+  "status": "completed",
+  "completedAt": "2026-05-11T11:10:00Z",
+  "plan": [
+    "Read all relevant source files (client.ts, mapping.ts, matching.ts, cron route, fixtures)",
+    "Rewrite lib/wire/client.ts with new Holocron API logic",
+    "Rewrite lib/wire/mapping.ts with real response shapes",
+    "Update lib/matching.ts with new PLATFORM_SEARCH_CONFIG",
+    "Update app/api/cron/refresh-spreads/route.ts with detail actions",
+    "Create new fixture directories for detail actions (kl_market_detail, mm_market_prob, pm_get_market, rh_get_event)",
+    "Update .env with WIRE_BASE_URL",
+    "Run tests to verify"
+  ],
+  "stepIndex": 8,
+  "currentStep": "Done",
+  "toolsUsed": ["Bash", "Write", "Read", "Edit"],
+  "filesModified": [
+    "lib/wire/client.ts",
+    "lib/wire/mapping.ts",
+    "lib/matching.ts",
+    "app/api/cron/refresh-spreads/route.ts",
+    "tests/fixtures/wire/kl_market_detail/__default__.json",
+    "tests/fixtures/wire/mm_market_prob/__default__.json",
+    "tests/fixtures/wire/pm_get_market/__default__.json",
+    "tests/fixtures/wire/rh_get_event/__default__.json",
+    "tests/fixtures/wire/pm_search_markets/__default__.json",
+    "tests/fixtures/wire/rh_get_markets/__default__.json",
+    ".env"
+  ]
+}

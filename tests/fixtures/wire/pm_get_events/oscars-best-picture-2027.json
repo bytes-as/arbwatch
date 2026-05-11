@@ -1,0 +1,38 @@
+{
+  "_fixture_meta": {
+    "action": "pm_get_events",
+    "query": "Oscars best picture 2027",
+    "slug": "oscars-best-picture-2027",
+    "recorded": "2026-05-11T00:00:00Z",
+    "note": "Synthetic fixture — values in [0,1]; YES outcome identified by outcomes[*].name === 'Yes' per ADR-0002 §Field mapping"
+  },
+  "events": [
+    {
+      "id": "PM-OSCARS-BP-2027",
+      "title": "2027 Academy Awards — Best Picture",
+      "active": true,
+      "markets": [
+        {
+          "id": "PM-MKT-OSCARS-BP-2027-FILM-X",
+          "question": "Will [Film X] win Best Picture at the 2027 Oscars?",
+          "outcomes": [
+            {
+              "name": "Yes",
+              "bid": 0.26,
+              "ask": 0.30,
+              "last_trade_price": 0.28,
+              "price": 0.28
+            },
+            {
+              "name": "No",
+              "bid": 0.70,
+              "ask": 0.74,
+              "last_trade_price": 0.72,
+              "price": 0.72
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

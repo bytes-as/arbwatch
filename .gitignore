@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Build outputs
+dist/
+
+# Environment — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# SQLite databases (preview.sh uses these locally)
+*.db
+*.db-shm
+*.db-wal
+
+# Drizzle migration tracking (generated, not committed)
+# drizzle/  ← keep migrations committed; only exclude temp/cache files
+
+# Test artifacts
+test-results/
+playwright-report/
+
+# OS / Editor
+.DS_Store
+.vscode/
+*.swp
+
+# Claude local project memory
+.claude/
+
+# TS incremental build info
+tsconfig.tsbuildinfo

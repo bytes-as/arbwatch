@@ -1,0 +1,6 @@
+{
+  "currentPhase": "phase-3-v2",
+  "currentSprint": 8,
+  "inFlight": ["task-billing-schema-test", "task-sso-test"],
+  "lastEvent": "phase-3-open; architect fleshed out 4 epics"
+}

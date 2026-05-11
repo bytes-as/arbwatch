@@ -1,0 +1,26 @@
+{
+  "_fixture_meta": {
+    "action": "mm_search_markets",
+    "query": "NFL Super Bowl LX winner",
+    "slug": "nfl-superbowl-lx",
+    "recorded": "2026-05-11T00:00:00Z",
+    "note": "Synthetic fixture — Manifold AMM: probability in [0,1], treated as bid==ask==midpoint per ADR-0002 §Field mapping"
+  },
+  "markets": [
+    {
+      "id": "MM-NFL-SB-LX",
+      "question": "Will an AFC team win Super Bowl LX?",
+      "url": "https://manifold.markets/market/will-afc-team-win-super-bowl-lx",
+      "outcomeType": "BINARY",
+      "probability": 0.60,
+      "pool": {
+        "YES": 12000,
+        "NO": 8000
+      },
+      "totalLiquidity": 2500,
+      "volume": 78000,
+      "isResolved": false,
+      "closeTime": 1770451199000
+    }
+  ]
+}

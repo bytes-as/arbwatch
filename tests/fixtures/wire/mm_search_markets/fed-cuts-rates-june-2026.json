@@ -1,0 +1,26 @@
+{
+  "_fixture_meta": {
+    "action": "mm_search_markets",
+    "query": "Fed cuts rates June 2026",
+    "slug": "fed-cuts-rates-june-2026",
+    "recorded": "2026-05-11T00:00:00Z",
+    "note": "Synthetic fixture — Manifold AMM: probability is in [0,1], treated as bid==ask==midpoint per ADR-0002 §Field mapping"
+  },
+  "markets": [
+    {
+      "id": "MM-FED-CUTS-JUNE-2026",
+      "question": "Will the Fed cut rates in June 2026?",
+      "url": "https://manifold.markets/market/will-fed-cut-rates-june-2026",
+      "outcomeType": "BINARY",
+      "probability": 0.45,
+      "pool": {
+        "YES": 5600,
+        "NO": 6800
+      },
+      "totalLiquidity": 1200,
+      "volume": 34000,
+      "isResolved": false,
+      "closeTime": 1751327999000
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1778444391302,
+      "tag": "0000_even_mysterio",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1778445809638,
+      "tag": "0001_lumpy_war_machine",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1778466836481,
+      "tag": "0002_clean_puff_adder",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1747008000000,
+      "tag": "0003_spread_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1747094400000,
+      "tag": "0004_alerts",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1747180800000,
+      "tag": "0005_alerts_multiuser",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1747267200000,
+      "tag": "0006_watched_questions_threshold",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1747353600000,
+      "tag": "0007_spread_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1747440000000,
+      "tag": "0008_push_subscriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1747526400000,
+      "tag": "0009_embedding_columns",
+      "breakpoints": true
+    }
+  ]
+}

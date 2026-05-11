@@ -1,0 +1,38 @@
+{
+  "_fixture_meta": {
+    "action": "pm_get_events",
+    "query": "Presidential election 2028 winner",
+    "slug": "presidential-election-2028",
+    "recorded": "2026-05-11T00:00:00Z",
+    "note": "Synthetic fixture — values in [0,1]; YES outcome identified by outcomes[*].name === 'Yes' per ADR-0002 §Field mapping"
+  },
+  "events": [
+    {
+      "id": "PM-PRES-2028",
+      "title": "2028 US Presidential Election",
+      "active": true,
+      "markets": [
+        {
+          "id": "PM-MKT-PRES-2028-DEM",
+          "question": "Will a Democrat win the 2028 Presidential election?",
+          "outcomes": [
+            {
+              "name": "Yes",
+              "bid": 0.50,
+              "ask": 0.54,
+              "last_trade_price": 0.52,
+              "price": 0.52
+            },
+            {
+              "name": "No",
+              "bid": 0.46,
+              "ask": 0.50,
+              "last_trade_price": 0.48,
+              "price": 0.48
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

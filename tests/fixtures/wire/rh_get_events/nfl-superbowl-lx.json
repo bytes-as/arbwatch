@@ -1,0 +1,32 @@
+{
+  "_fixture_meta": {
+    "action": "rh_get_events",
+    "query": "NFL Super Bowl LX winner",
+    "slug": "nfl-superbowl-lx",
+    "recorded": "2026-05-11T00:00:00Z",
+    "note": "Synthetic fixture — values in [0,1]; YES contract identified by contracts[*].side === 'yes' per ADR-0002 §Field mapping"
+  },
+  "events": [
+    {
+      "id": "RH-NFL-SB-LX",
+      "title": "Super Bowl LX — AFC team wins?",
+      "status": "open",
+      "contracts": [
+        {
+          "id": "RH-CONTRACT-NFL-SB-LX-YES",
+          "side": "yes",
+          "bid_price": 0.56,
+          "ask_price": 0.60,
+          "last_trade_price": 0.58
+        },
+        {
+          "id": "RH-CONTRACT-NFL-SB-LX-NO",
+          "side": "no",
+          "bid_price": 0.40,
+          "ask_price": 0.44,
+          "last_trade_price": 0.42
+        }
+      ]
+    }
+  ]
+}
