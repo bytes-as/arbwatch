@@ -21,7 +21,16 @@ export default function SettingsKeyClient() {
   const [removing, setRemoving] = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState(false);
   const [removeSuccess, setRemoveSuccess] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<string | null>(null);
   const confirmYesRef = useRef<HTMLButtonElement>(null);
+
+  // Fetch current key status on mount
+  useEffect(() => {
+    fetch("/api/me/anakin-key", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.status) setCurrentStatus(data.status); })
+      .catch(() => {});
+  }, []);
 
   // Autofocus the input on mount
   useEffect(() => {
@@ -74,6 +83,8 @@ export default function SettingsKeyClient() {
       }
 
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setCurrentStatus(data.status ?? "ok");
         setSuccessMessage("Key saved successfully.");
         setKeyValue("");
         setSubmitting(false);
@@ -136,10 +147,22 @@ export default function SettingsKeyClient() {
 
   return (
     <div className="settings-key-content">
+      {/* Current key status */}
+      {currentStatus && (
+        <div className="settings-section" style={{ paddingBottom: "1rem" }}>
+          <p style={{ margin: 0, fontSize: "0.9rem", color: currentStatus === "ok" ? "var(--color-success, #4ade80)" : "var(--color-muted, #888)" }}>
+            {currentStatus === "ok" && "✓ Anakin key is active"}
+            {currentStatus === "key-missing" && "No key set"}
+            {currentStatus === "key-invalid" && "⚠ Key is invalid — paste a new one below"}
+            {currentStatus === "quota-exhausted" && "⚠ Quota exhausted — paste a new key or wait for reset"}
+          </p>
+        </div>
+      )}
+
       {/* Rotate section */}
       <section aria-labelledby="rotate-heading" className="settings-section">
         <h2 id="rotate-heading" className="settings-section-heading">
-          Rotate your Anakin key
+          {currentStatus === "ok" ? "Rotate your Anakin key" : "Add your Anakin key"}
         </h2>
         <p className="auth-sub">
           Paste your new key below. The old key will be replaced immediately.

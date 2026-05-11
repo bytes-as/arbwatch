@@ -173,13 +173,17 @@ export async function searchPlatforms(
   );
 
   const results: SearchResult[] = [];
-  for (const result of settled) {
+  for (let i = 0; i < settled.length; i++) {
+    const result = settled[i];
     if (result.status === "fulfilled") {
       results.push(...result.value);
     } else {
       const err = result.reason;
-      if (err instanceof WireError && (err.class === "key-missing" || err.class === "key-invalid")) {
-        throw err;
+      if (err instanceof WireError) {
+        if (err.class === "key-missing" || err.class === "key-invalid") throw err;
+        console.warn(`[search] Wire error on ${configs[i].platform}: ${err.class}`);
+      } else {
+        console.warn(`[search] Unexpected error on ${configs[i].platform}:`, err);
       }
     }
   }
