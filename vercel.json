@@ -1,8 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/refresh-spreads",
-      "schedule": "0 * * * *"
-    }
-  ]
-}
+{}
