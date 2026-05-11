@@ -19,7 +19,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, sqlite } from "../../../db/client";
+import { db, rawQuery } from "../../../db/client";
 import { sessions, watchedQuestions } from "../../../db/schema";
 import { eq, and, gt, count } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
@@ -85,17 +85,13 @@ export async function GET(request: NextRequest) {
 
   // Use raw SQL to retrieve as-stored integer for created_at (ms or s depending
   // on insertion path) and order correctly regardless of encoding.
-  const rows = sqlite
-    .prepare(
-      `SELECT id, query_text, created_at FROM watched_questions
-       WHERE user_id = ?
-       ORDER BY created_at DESC`
-    )
-    .all(session.userId) as Array<{
+  const rows = await rawQuery<{
     id: string;
     query_text: string;
     created_at: number;
-  }>;
+  }>`SELECT id, query_text, created_at FROM watched_questions
+       WHERE user_id = ${session.userId}
+       ORDER BY created_at DESC`;
 
   return NextResponse.json(rows);
 }
@@ -147,11 +143,7 @@ export async function POST(request: NextRequest) {
   const id = randomUUID();
   const createdAt = Date.now();
 
-  sqlite
-    .prepare(
-      "INSERT INTO watched_questions (id, user_id, query_text, created_at) VALUES (?, ?, ?, ?)"
-    )
-    .run(id, session.userId, trimmed, createdAt);
+  await rawQuery`INSERT INTO watched_questions (id, user_id, query_text, created_at) VALUES (${id}, ${session.userId}, ${trimmed}, ${createdAt})`;
 
   let matchingStatus: string | undefined;
 
@@ -160,20 +152,21 @@ export async function POST(request: NextRequest) {
   if (preMatches && preMatches.length > 0) {
     // Insert pre-matched rows directly — no Wire call needed
     const now = Date.now();
-    const insert = sqlite.prepare(
-      `INSERT INTO question_matches
-         (id, question_id, platform, market_id, market_url, market_title, implied_yes_prob, last_seen_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT (question_id, platform) DO UPDATE SET
-         market_id = excluded.market_id,
-         market_url = excluded.market_url,
-         market_title = excluded.market_title,
-         implied_yes_prob = excluded.implied_yes_prob,
-         last_seen_at = excluded.last_seen_at`
-    );
     for (const m of preMatches) {
       if (m.platform && m.market_id) {
-        insert.run(randomUUID(), id, m.platform, m.market_id, m.market_url ?? null, m.market_title ?? null, m.implied_yes_prob ?? null, now);
+        const matchId = randomUUID();
+        const mUrl = m.market_url ?? null;
+        const mTitle = m.market_title ?? null;
+        const mProb = m.implied_yes_prob ?? null;
+        await rawQuery`INSERT INTO question_matches
+           (id, question_id, platform, market_id, market_url, market_title, implied_yes_prob, last_seen_at)
+         VALUES (${matchId}, ${id}, ${m.platform}, ${m.market_id}, ${mUrl}, ${mTitle}, ${mProb}, ${now})
+         ON CONFLICT (question_id, platform) DO UPDATE SET
+           market_id = excluded.market_id,
+           market_url = excluded.market_url,
+           market_title = excluded.market_title,
+           implied_yes_prob = excluded.implied_yes_prob,
+           last_seen_at = excluded.last_seen_at`;
       }
     }
 
@@ -188,37 +181,34 @@ export async function POST(request: NextRequest) {
       if (probs.length >= 2) {
         initialSpread = computeSpreadForQuestion(probs);
         const nowSec = Math.floor(now / 1000);
-        sqlite.prepare(
-          `INSERT INTO spread_snapshots (id, question_id, spread, last_updated, computed_at)
-           VALUES (?, ?, ?, ?, ?)
+        const ssId = randomUUID();
+        await rawQuery`INSERT INTO spread_snapshots (id, question_id, spread, last_updated, computed_at)
+           VALUES (${ssId}, ${id}, ${initialSpread}, ${nowSec}, ${nowSec})
            ON CONFLICT (question_id) DO UPDATE SET
              spread = excluded.spread,
              last_updated = excluded.last_updated,
-             computed_at = excluded.computed_at`
-        ).run(randomUUID(), id, initialSpread, nowSec, nowSec);
-        sqlite.prepare(
-          `INSERT INTO spread_history (id, question_id, spread, computed_at) VALUES (?, ?, ?, ?)`
-        ).run(randomUUID(), id, initialSpread, nowSec);
+             computed_at = excluded.computed_at`;
+        const shId = randomUUID();
+        await rawQuery`INSERT INTO spread_history (id, question_id, spread, computed_at) VALUES (${shId}, ${id}, ${initialSpread}, ${nowSec})`;
 
         // Update implied_yes_prob in question_matches with fresh prices
         for (let i = 0; i < preMatches.length && i < freshProbs.length; i++) {
           if (freshProbs[i] !== null) {
-            sqlite.prepare(
-              `UPDATE question_matches SET implied_yes_prob = ? WHERE question_id = ? AND platform = ?`
-            ).run(freshProbs[i], id, preMatches[i].platform);
+            const fp = freshProbs[i];
+            const platform = preMatches[i].platform;
+            await rawQuery`UPDATE question_matches SET implied_yes_prob = ${fp} WHERE question_id = ${id} AND platform = ${platform}`;
           }
         }
       } else if (probs.length === 1) {
         // 1 platform: write null spread so cron knows it was attempted
         const nowSec = Math.floor(now / 1000);
-        sqlite.prepare(
-          `INSERT INTO spread_snapshots (id, question_id, spread, last_updated, computed_at)
-           VALUES (?, ?, NULL, ?, ?)
+        const ssId = randomUUID();
+        await rawQuery`INSERT INTO spread_snapshots (id, question_id, spread, last_updated, computed_at)
+           VALUES (${ssId}, ${id}, ${null}, ${nowSec}, ${nowSec})
            ON CONFLICT (question_id) DO UPDATE SET
              spread = NULL,
              last_updated = excluded.last_updated,
-             computed_at = excluded.computed_at`
-        ).run(randomUUID(), id, nowSec, nowSec);
+             computed_at = excluded.computed_at`;
       }
     } catch {
       // Spread computation is best-effort — cron will pick it up

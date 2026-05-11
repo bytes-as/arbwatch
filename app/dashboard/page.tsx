@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { db, sqlite } from "../../db/client";
-import { users, sessions } from "../../db/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { db, rawQuery } from "../../db/client";
+import { users, sessions, spreadSnapshots, questionMatches, spreadHistory } from "../../db/schema";
+import { eq, and, gt, inArray } from "drizzle-orm";
 import DashboardClient from "./DashboardClient";
 import type { WatchedQuestion, Platform, SpreadHistoryPoint } from "./WatchedSection";
 
@@ -50,44 +50,47 @@ async function getUserInfo(): Promise<{
 }
 
 async function getWatchedQuestions(userId: string): Promise<WatchedQuestion[]> {
-  const rows = sqlite
-    .prepare(
-      `SELECT id, query_text, created_at, threshold FROM watched_questions
-       WHERE user_id = ?
-       ORDER BY created_at ASC`
-    )
-    .all(userId) as Array<{ id: string; query_text: string; created_at: number; threshold: number | null }>;
+  const rows = await rawQuery<{ id: string; query_text: string; created_at: number; threshold: number | null }>`SELECT id, query_text, created_at, threshold FROM watched_questions
+       WHERE user_id = ${userId}
+       ORDER BY created_at ASC`;
 
   if (rows.length === 0) return [];
 
-  const questionIds = rows.map((r) => `'${r.id.replace(/'/g, "''")}'`).join(", ");
+  const ids = rows.map((r) => r.id);
   const sevenDaysAgo = Math.floor(Date.now() / 1000) - 7 * 86_400;
 
-  const snapshots = sqlite
-    .prepare(
-      `SELECT question_id, spread, last_updated
-       FROM spread_snapshots
-       WHERE question_id IN (${questionIds})
-       ORDER BY computed_at DESC`
-    )
-    .all() as Array<{ question_id: string; spread: number | null; last_updated: number }>;
-
-  const matches = sqlite
-    .prepare(
-      `SELECT question_id, platform, market_id, market_url, market_title, implied_yes_prob, close_date
-       FROM question_matches
-       WHERE question_id IN (${questionIds})`
-    )
-    .all() as Array<{ question_id: string; platform: Platform; market_id: string; market_url: string | null; market_title: string | null; implied_yes_prob: number | null; close_date: string | null }>;
-
-  const historyRows = sqlite
-    .prepare(
-      `SELECT question_id, spread, computed_at
-       FROM spread_history
-       WHERE question_id IN (${questionIds}) AND computed_at >= ?
-       ORDER BY computed_at ASC`
-    )
-    .all(sevenDaysAgo) as Array<{ question_id: string; spread: number | null; computed_at: number }>;
+  const [snapshots, matches, historyRows] = await Promise.all([
+    db
+      .select({
+        question_id: spreadSnapshots.questionId,
+        spread: spreadSnapshots.spread,
+        last_updated: spreadSnapshots.lastUpdated,
+      })
+      .from(spreadSnapshots)
+      .where(inArray(spreadSnapshots.questionId, ids))
+      .orderBy(spreadSnapshots.computedAt),
+    db
+      .select({
+        question_id: questionMatches.questionId,
+        platform: questionMatches.platform,
+        market_id: questionMatches.marketId,
+        market_url: questionMatches.marketUrl,
+        market_title: questionMatches.marketTitle,
+        implied_yes_prob: questionMatches.impliedYesProb,
+        close_date: questionMatches.closeDate,
+      })
+      .from(questionMatches)
+      .where(inArray(questionMatches.questionId, ids)),
+    db
+      .select({
+        question_id: spreadHistory.questionId,
+        spread: spreadHistory.spread,
+        computed_at: spreadHistory.computedAt,
+      })
+      .from(spreadHistory)
+      .where(and(inArray(spreadHistory.questionId, ids), gt(spreadHistory.computedAt, sevenDaysAgo)))
+      .orderBy(spreadHistory.computedAt),
+  ]);
 
   const snapshotMap = new Map<string, { spread: number | null; last_updated: number }>();
   for (const s of snapshots) {

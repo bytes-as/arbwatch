@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, sqlite } from "../../../../../db/client";
+import { db, rawQuery } from "../../../../../db/client";
 import { sessions, watchedQuestions } from "../../../../../db/schema";
 import { eq, and, gt } from "drizzle-orm";
 
@@ -70,14 +70,10 @@ export async function GET(
 
   const sevenDaysAgo = Math.floor(Date.now() / 1000) - 7 * 86_400;
 
-  const rows = sqlite
-    .prepare(
-      `SELECT spread, computed_at
+  const rows = await rawQuery<{ spread: number | null; computed_at: number }>`SELECT spread, computed_at
        FROM spread_history
-       WHERE question_id = ? AND computed_at >= ?
-       ORDER BY computed_at ASC`
-    )
-    .all(id, sevenDaysAgo) as Array<{ spread: number | null; computed_at: number }>;
+       WHERE question_id = ${id} AND computed_at >= ${sevenDaysAgo}
+       ORDER BY computed_at ASC`;
 
   return NextResponse.json(rows);
 }

@@ -11,7 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, sqlite } from "../../../../../db/client";
+import { db, rawQuery } from "../../../../../db/client";
 import { sessions } from "../../../../../db/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { searchPlatforms } from "../../../../../lib/marketSearch";
@@ -49,9 +49,8 @@ export async function POST(
 
   const { id } = await params;
 
-  const question = sqlite
-    .prepare(`SELECT id, query_text FROM watched_questions WHERE id = ? AND user_id = ?`)
-    .get(id, session.userId) as { id: string; query_text: string } | undefined;
+  const questionRows = await rawQuery<{ id: string; query_text: string }>`SELECT id, query_text FROM watched_questions WHERE id = ${id} AND user_id = ${session.userId}`;
+  const question = questionRows[0];
 
   if (!question) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -76,20 +75,14 @@ export async function POST(
     platformsToSearch = [targetPlatform];
   } else {
     // Global fill: only search for platforms that have NO match yet
-    const existing = sqlite
-      .prepare(`SELECT platform FROM question_matches WHERE question_id = ?`)
-      .all(id) as Array<{ platform: Platform }>;
+    const existing = await rawQuery<{ platform: Platform }>`SELECT platform FROM question_matches WHERE question_id = ${id}`;
     const matchedPlatforms = new Set(existing.map((r) => r.platform));
     platformsToSearch = ALL_SEARCHABLE_PLATFORMS.filter((p) => !matchedPlatforms.has(p));
 
     if (platformsToSearch.length === 0) {
       // All platforms already matched — return current matches unchanged
-      const current = sqlite
-        .prepare(
-          `SELECT platform, market_id, market_url, market_title, implied_yes_prob, close_date
-           FROM question_matches WHERE question_id = ?`
-        )
-        .all(id) as Array<{ platform: Platform; market_id: string; market_url: string | null; market_title: string | null; implied_yes_prob: number | null; close_date: string | null }>;
+      const current = await rawQuery<{ platform: Platform; market_id: string; market_url: string | null; market_title: string | null; implied_yes_prob: number | null; close_date: string | null }>`SELECT platform, market_id, market_url, market_title, implied_yes_prob, close_date
+           FROM question_matches WHERE question_id = ${id}`;
       return NextResponse.json({ matches: current, message: "All platforms already matched" });
     }
   }
@@ -113,36 +106,30 @@ export async function POST(
   });
 
   const now = Date.now();
-  const upsert = sqlite.prepare(`
-    INSERT INTO question_matches (id, question_id, platform, market_id, market_url, market_title, implied_yes_prob, last_seen_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+
+  for (const r of deduped) {
+    const rid = randomUUID();
+    await rawQuery`INSERT INTO question_matches (id, question_id, platform, market_id, market_url, market_title, implied_yes_prob, last_seen_at)
+    VALUES (${rid}, ${id}, ${r.platform}, ${r.market_id}, ${r.market_url}, ${r.market_title}, ${r.implied_yes_prob}, ${now})
     ON CONFLICT(question_id, platform) DO UPDATE SET
       market_id = excluded.market_id,
       market_url = excluded.market_url,
       market_title = excluded.market_title,
       implied_yes_prob = excluded.implied_yes_prob,
       last_seen_at = excluded.last_seen_at,
-      close_date = NULL
-  `);
-
-  for (const r of deduped) {
-    upsert.run(randomUUID(), id, r.platform, r.market_id, r.market_url, r.market_title, r.implied_yes_prob, now);
+      close_date = NULL`;
   }
 
   // Return all current matches (not just the newly added ones)
-  const matches = sqlite
-    .prepare(
-      `SELECT platform, market_id, market_url, market_title, implied_yes_prob, close_date
-       FROM question_matches WHERE question_id = ?`
-    )
-    .all(id) as Array<{
-      platform: Platform;
-      market_id: string;
-      market_url: string | null;
-      market_title: string | null;
-      implied_yes_prob: number | null;
-      close_date: string | null;
-    }>;
+  const matches = await rawQuery<{
+    platform: Platform;
+    market_id: string;
+    market_url: string | null;
+    market_title: string | null;
+    implied_yes_prob: number | null;
+    close_date: string | null;
+  }>`SELECT platform, market_id, market_url, market_title, implied_yes_prob, close_date
+       FROM question_matches WHERE question_id = ${id}`;
 
   return NextResponse.json({ matches });
 }

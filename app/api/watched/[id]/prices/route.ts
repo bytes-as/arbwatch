@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, sqlite } from "../../../../../db/client";
+import { db, rawQuery } from "../../../../../db/client";
 import { sessions } from "../../../../../db/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { wireRequest } from "../../../../../lib/wire/client";
@@ -64,14 +64,10 @@ export async function GET(
 
   const { id } = await params;
 
-  const matches = sqlite
-    .prepare(
-      `SELECT qm.platform, qm.market_id
+  const matches = await rawQuery<{ platform: string; market_id: string }>`SELECT qm.platform, qm.market_id
        FROM question_matches qm
        JOIN watched_questions wq ON wq.id = qm.question_id
-       WHERE qm.question_id = ? AND wq.user_id = ?`
-    )
-    .all(id, session.userId) as Array<{ platform: string; market_id: string }>;
+       WHERE qm.question_id = ${id} AND wq.user_id = ${session.userId}`;
 
   if (matches.length === 0) return NextResponse.json({ prices: [] });
 
@@ -106,11 +102,7 @@ export async function GET(
   // Persist fresh prices back to DB
   for (const p of prices) {
     if (p.implied_yes_prob !== null || p.close_date !== null) {
-      sqlite
-        .prepare(
-          `UPDATE question_matches SET implied_yes_prob = COALESCE(?, implied_yes_prob), close_date = COALESCE(?, close_date) WHERE question_id = ? AND platform = ?`
-        )
-        .run(p.implied_yes_prob, p.close_date, id, p.platform);
+      await rawQuery`UPDATE question_matches SET implied_yes_prob = COALESCE(${p.implied_yes_prob}, implied_yes_prob), close_date = COALESCE(${p.close_date}, close_date) WHERE question_id = ${id} AND platform = ${p.platform}`;
     }
   }
 

@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, sqlite } from "../../../../db/client";
+import { db, rawQuery } from "../../../../db/client";
 import { sessions, watchedQuestions } from "../../../../db/schema";
 import { eq, and, gt } from "drizzle-orm";
 
@@ -80,11 +80,8 @@ export async function DELETE(
   }
 
   // Cascade to question_matches if the table exists (task-matching-impl dependency).
-  // Uses raw SQLite to avoid a hard Drizzle schema dependency on a table that
-  // may not exist yet.
-  // TODO (task-matching-impl): remove try/catch once question_matches lands.
   try {
-    sqlite.prepare("DELETE FROM question_matches WHERE question_id = ?").run(id);
+    await rawQuery`DELETE FROM question_matches WHERE question_id = ${id}`;
   } catch {
     // Table does not exist yet — skip cascade silently.
   }
@@ -155,13 +152,10 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  sqlite
-    .prepare(`UPDATE watched_questions SET threshold = ? WHERE id = ? AND user_id = ?`)
-    .run(threshold, id, session.userId);
+  await rawQuery`UPDATE watched_questions SET threshold = ${threshold} WHERE id = ${id} AND user_id = ${session.userId}`;
 
-  const updated = sqlite
-    .prepare(`SELECT id, query_text, created_at, threshold FROM watched_questions WHERE id = ?`)
-    .get(id) as { id: string; query_text: string; created_at: number; threshold: number | null } | undefined;
+  const updatedRows = await rawQuery<{ id: string; query_text: string; created_at: number; threshold: number | null }>`SELECT id, query_text, created_at, threshold FROM watched_questions WHERE id = ${id}`;
+  const updated = updatedRows[0];
 
   return NextResponse.json(updated, { status: 200 });
 }

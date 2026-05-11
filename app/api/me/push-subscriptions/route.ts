@@ -11,7 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, sqlite } from "../../../../db/client";
+import { db, rawQuery } from "../../../../db/client";
 import { sessions } from "../../../../db/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
@@ -67,16 +67,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const nowSec = Math.floor(Date.now() / 1000);
 
-  sqlite
-    .prepare(
-      `INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)
+  const psId = randomUUID();
+  await rawQuery`INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth, created_at)
+       VALUES (${psId}, ${session.userId}, ${body.endpoint}, ${body.p256dh}, ${body.auth}, ${nowSec})
        ON CONFLICT (user_id, endpoint) DO UPDATE SET
          p256dh = excluded.p256dh,
          auth = excluded.auth,
-         created_at = excluded.created_at`
-    )
-    .run(randomUUID(), session.userId, body.endpoint, body.p256dh, body.auth, nowSec);
+         created_at = excluded.created_at`;
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }
@@ -98,11 +95,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  sqlite
-    .prepare(
-      `DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?`
-    )
-    .run(session.userId, body.endpoint);
+  await rawQuery`DELETE FROM push_subscriptions WHERE user_id = ${session.userId} AND endpoint = ${body.endpoint}`;
 
   return new NextResponse(null, { status: 204 });
 }

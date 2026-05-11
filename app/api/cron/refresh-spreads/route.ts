@@ -22,7 +22,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { sqlite } from "../../../../db/client";
+import { rawQuery, testDbUrlStore } from "../../../../db/client";
 import { wireRequest } from "../../../../lib/wire/client";
 import { extractImpliedYesProb } from "../../../../lib/wire/mapping";
 import { WireError } from "../../../../lib/wire/errors";
@@ -35,7 +35,6 @@ import {
   markQuestionProcessed,
   isQuestionProcessed,
 } from "../../../../lib/cron";
-import { testDbUrlStore } from "../../../../db/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -100,9 +99,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   let snapshots_written = 0;
   const errors: Array<{ user_id: string; error: string }> = [];
 
-  const users = sqlite
-    .prepare(`SELECT id, anakin_key_status, anakin_key_status_at FROM users`)
-    .all() as UserRecord[];
+  const users = await rawQuery<UserRecord>`SELECT id, anakin_key_status, anakin_key_status_at FROM users`;
 
   for (const user of users) {
     if (shouldSkipUser(user, nowMs)) {
@@ -112,50 +109,36 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Cooldown expired: reset status to 'ok' so getDecryptedAnakinKey succeeds.
     // If the Wire call fails again with quota, the handler sets it back.
     if (user.anakin_key_status === "quota-exhausted") {
-      sqlite
-        .prepare(
-          `UPDATE users SET anakin_key_status = 'ok', anakin_key_status_at = ? WHERE id = ?`
-        )
-        .run(Math.floor(nowMs / 1000), user.id);
+      const nowSec = Math.floor(nowMs / 1000);
+      await rawQuery`UPDATE users SET anakin_key_status = 'ok', anakin_key_status_at = ${nowSec} WHERE id = ${user.id}`;
     }
 
     users_processed++;
 
-    const questions = sqlite
-      .prepare(
-        `SELECT id, query_text FROM watched_questions WHERE user_id = ?`
-      )
-      .all(user.id) as QuestionRecord[];
+    const questions = await rawQuery<QuestionRecord>`SELECT id, query_text FROM watched_questions WHERE user_id = ${user.id}`;
 
     const controller = new AbortController();
     const budgetTimer = setTimeout(() => controller.abort(), PER_USER_BUDGET_MS);
 
     try {
       const questionTasks = questions.map(async (question) => {
-        const matches = sqlite
-          .prepare(
-            `SELECT platform, market_id, implied_yes_prob FROM question_matches WHERE question_id = ?`
-          )
-          .all(question.id) as MatchRecord[];
+        const matches = await rawQuery<MatchRecord>`SELECT platform, market_id, implied_yes_prob FROM question_matches WHERE question_id = ${question.id}`;
 
         if (matches.length === 0) {
           return;
         }
 
         if (matches.length === 1) {
-          upsertSnapshot(question.id, null, nowMs);
-          appendHistory(question.id, null, nowMs);
+          await upsertSnapshot(question.id, null, nowMs);
+          await appendHistory(question.id, null, nowMs);
           snapshots_written++;
           return;
         }
 
         // Check per-question idempotency: if there is a recent snapshot (< 60s),
         // re-use cached spread (no Wire calls) and advance last_updated only.
-        const existing = sqlite
-          .prepare(
-            `SELECT spread, last_updated FROM spread_snapshots WHERE question_id = ?`
-          )
-          .get(question.id) as SnapshotRecord | undefined;
+        const existingRows = await rawQuery<SnapshotRecord>`SELECT spread, last_updated FROM spread_snapshots WHERE question_id = ${question.id}`;
+        const existing = existingRows[0];
 
         const existingMs = existing?.last_updated != null
           ? existing.last_updated * 1000
@@ -177,8 +160,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
         if (isRecent && isQuestionProcessed(dbUrl, question.id)) {
           // Re-use cached spread; advance timestamp to satisfy DoD 6 invariant.
-          upsertSnapshot(question.id, existing!.spread, nowMs);
-          appendHistory(question.id, existing!.spread, nowMs);
+          await upsertSnapshot(question.id, existing!.spread, nowMs);
+          await appendHistory(question.id, existing!.spread, nowMs);
           snapshots_written++;
           return;
         }
@@ -204,22 +187,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             const err = result.reason;
             if (err instanceof WireError) {
               if (err.class === "quota-exhausted") {
-                sqlite
-                  .prepare(
-                    `UPDATE users SET anakin_key_status = 'quota-exhausted',
-                     anakin_key_status_at = ? WHERE id = ?`
-                  )
-                  .run(Math.floor(nowMs / 1000), user.id);
+                const nowSec2 = Math.floor(nowMs / 1000);
+                await rawQuery`UPDATE users SET anakin_key_status = 'quota-exhausted', anakin_key_status_at = ${nowSec2} WHERE id = ${user.id}`;
                 errors.push({ user_id: user.id, error: err.class });
                 throw err;
               }
               if (err.class === "key-invalid") {
-                sqlite
-                  .prepare(
-                    `UPDATE users SET anakin_key_status = 'key-invalid',
-                     anakin_key_status_at = ? WHERE id = ?`
-                  )
-                  .run(Math.floor(nowMs / 1000), user.id);
+                const nowSec2 = Math.floor(nowMs / 1000);
+                await rawQuery`UPDATE users SET anakin_key_status = 'key-invalid', anakin_key_status_at = ${nowSec2} WHERE id = ${user.id}`;
                 errors.push({ user_id: user.id, error: err.class });
                 throw err;
               }
@@ -244,8 +219,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
                 .filter((p): p is number => p !== null);
 
         const spread = computeSpreadForQuestion(effectiveProbs);
-        upsertSnapshot(question.id, spread, nowMs);
-        appendHistory(question.id, spread, nowMs);
+        await upsertSnapshot(question.id, spread, nowMs);
+        await appendHistory(question.id, spread, nowMs);
         markQuestionProcessed(dbUrl, question.id);
         snapshots_written++;
       });
@@ -260,40 +235,32 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  pruneHistory(nowMs);
+  await pruneHistory(nowMs);
 
   return NextResponse.json({ users_processed, snapshots_written, errors });
 }
 
 
-function upsertSnapshot(questionId: string, spread: number | null, nowMs: number): void {
+async function upsertSnapshot(questionId: string, spread: number | null, nowMs: number): Promise<void> {
   const nowSec = Math.floor(nowMs / 1000);
-  sqlite
-    .prepare(
-      `INSERT INTO spread_snapshots (id, question_id, spread, last_updated, computed_at)
-       VALUES (?, ?, ?, ?, ?)
+  const ssId = randomUUID();
+  await rawQuery`INSERT INTO spread_snapshots (id, question_id, spread, last_updated, computed_at)
+       VALUES (${ssId}, ${questionId}, ${spread}, ${nowSec}, ${nowSec})
        ON CONFLICT (question_id) DO UPDATE SET
          spread = excluded.spread,
          last_updated = excluded.last_updated,
-         computed_at = excluded.computed_at`
-    )
-    .run(randomUUID(), questionId, spread, nowSec, nowSec);
+         computed_at = excluded.computed_at`;
 }
 
-function appendHistory(questionId: string, spread: number | null, nowMs: number): void {
+async function appendHistory(questionId: string, spread: number | null, nowMs: number): Promise<void> {
   const nowSec = Math.floor(nowMs / 1000);
-  sqlite
-    .prepare(
-      `INSERT INTO spread_history (id, question_id, spread, computed_at)
-       VALUES (?, ?, ?, ?)`
-    )
-    .run(randomUUID(), questionId, spread, nowSec);
+  const shId = randomUUID();
+  await rawQuery`INSERT INTO spread_history (id, question_id, spread, computed_at)
+       VALUES (${shId}, ${questionId}, ${spread}, ${nowSec})`;
 }
 
 // Prune rows older than HISTORY_RETENTION_DAYS. Called once per cron sweep after all users.
-function pruneHistory(nowMs: number): void {
+async function pruneHistory(nowMs: number): Promise<void> {
   const cutoffSec = Math.floor(nowMs / 1000) - HISTORY_RETENTION_DAYS * 86_400;
-  sqlite
-    .prepare(`DELETE FROM spread_history WHERE computed_at < ?`)
-    .run(cutoffSec);
+  await rawQuery`DELETE FROM spread_history WHERE computed_at < ${cutoffSec}`;
 }

@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { db, sqlite } from "../../db/client";
+import { db, rawQuery } from "../../db/client";
 import { sessions, watchedQuestions } from "../../db/schema";
 import { eq, and, gt, count } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
@@ -82,11 +82,7 @@ export async function addWatchedQuestionAction(
   const id = randomUUID();
   const createdAt = Date.now();
 
-  sqlite
-    .prepare(
-      "INSERT INTO watched_questions (id, user_id, query_text, created_at) VALUES (?, ?, ?, ?)"
-    )
-    .run(id, session.userId, trimmed, createdAt);
+  await rawQuery`INSERT INTO watched_questions (id, user_id, query_text, created_at) VALUES (${id}, ${session.userId}, ${trimmed}, ${createdAt})`;
 
   redirect("/dashboard");
 }
@@ -120,7 +116,7 @@ export async function removeWatchedQuestionAction(
   if (!row) return;
 
   try {
-    sqlite.prepare("DELETE FROM question_matches WHERE question_id = ?").run(id);
+    await rawQuery`DELETE FROM question_matches WHERE question_id = ${id}`;
   } catch {
     // Table does not exist yet
   }

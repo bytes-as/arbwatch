@@ -25,7 +25,7 @@ import {
   extractMarketUrl,
 } from "./wire/mapping";
 import { matchWithEmbeddings, embedText } from "./matching/embeddings";
-import { sqlite } from "../db/client";
+import { rawQuery } from "../db/client";
 
 type Platform = "kalshi" | "manifold" | "polymarket" | "robinhood";
 
@@ -217,9 +217,8 @@ export async function matchQuestion(
           // Persist query embedding
           const queryVec = await embedText(queryText);
           if (queryVec) {
-            sqlite
-              .prepare(`UPDATE watched_questions SET embedding = ? WHERE id = ?`)
-              .run(Buffer.from(queryVec.buffer), questionId);
+            const embBuf = Buffer.from(queryVec.buffer);
+            await rawQuery`UPDATE watched_questions SET embedding = ${embBuf} WHERE id = ${questionId}`;
           }
         }
       }
@@ -265,34 +264,21 @@ export async function matchQuestion(
       market_title: marketTitle,
     };
 
-    sqlite
-      .prepare(
-        `INSERT INTO question_matches
+    const matchRowId = randomUUID();
+    const mUrl = marketUrl ?? null;
+    const mProb = impliedYesProb ?? null;
+    await rawQuery`INSERT INTO question_matches
            (id, question_id, platform, market_id, market_url, implied_yes_prob, last_seen_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+         VALUES (${matchRowId}, ${questionId}, ${platform}, ${marketId}, ${mUrl}, ${mProb}, ${now})
          ON CONFLICT (question_id, platform) DO UPDATE SET
            market_id = excluded.market_id,
            market_url = excluded.market_url,
            implied_yes_prob = excluded.implied_yes_prob,
-           last_seen_at = excluded.last_seen_at`
-      )
-      .run(
-        randomUUID(),
-        questionId,
-        platform,
-        marketId,
-        marketUrl ?? null,
-        impliedYesProb ?? null,
-        now
-      );
+           last_seen_at = excluded.last_seen_at`;
 
     if (matchScore !== null) {
-      sqlite
-        .prepare(
-          `UPDATE question_matches SET match_score = ?
-           WHERE question_id = ? AND platform = ?`
-        )
-        .run(matchScore, questionId, platform);
+      await rawQuery`UPDATE question_matches SET match_score = ${matchScore}
+           WHERE question_id = ${questionId} AND platform = ${platform}`;
     }
 
     rows.push(row);

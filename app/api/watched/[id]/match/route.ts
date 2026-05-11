@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, sqlite } from "../../../../../db/client";
+import { db, rawQuery } from "../../../../../db/client";
 import { sessions } from "../../../../../db/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { wireRequest } from "../../../../../lib/wire/client";
@@ -21,6 +21,7 @@ import {
   extractCloseDate,
 } from "../../../../../lib/wire/mapping";
 import type { Platform } from "../../../../../lib/marketSearch";
+import { randomUUID } from "node:crypto";
 
 const SESSION_COOKIE_NAME =
   process.env.NODE_ENV === "production"
@@ -129,9 +130,8 @@ export async function POST(
   const { id } = await params;
 
   // Verify question belongs to this user
-  const question = sqlite
-    .prepare(`SELECT id FROM watched_questions WHERE id = ? AND user_id = ?`)
-    .get(id, session.userId) as { id: string } | undefined;
+  const questionRows = await rawQuery<{ id: string }>`SELECT id FROM watched_questions WHERE id = ${id} AND user_id = ${session.userId}`;
+  const question = questionRows[0];
 
   if (!question) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -192,18 +192,16 @@ export async function POST(
   }
 
   // Upsert into question_matches
-  sqlite
-    .prepare(`
-      INSERT INTO question_matches (question_id, platform, market_id, market_url, market_title, implied_yes_prob, close_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+  const matchInsertId = randomUUID();
+  const nowMs = Date.now();
+  await rawQuery`INSERT INTO question_matches (id, question_id, platform, market_id, market_url, market_title, implied_yes_prob, last_seen_at, close_date)
+      VALUES (${matchInsertId}, ${id}, ${platform}, ${market_id}, ${resolved_market_url}, ${market_title}, ${implied_yes_prob}, ${nowMs}, ${close_date})
       ON CONFLICT(question_id, platform) DO UPDATE SET
         market_id = excluded.market_id,
         market_url = excluded.market_url,
         market_title = COALESCE(excluded.market_title, market_title),
         implied_yes_prob = COALESCE(excluded.implied_yes_prob, implied_yes_prob),
-        close_date = COALESCE(excluded.close_date, close_date)
-    `)
-    .run(id, platform, market_id, resolved_market_url, market_title, implied_yes_prob, close_date);
+        close_date = COALESCE(excluded.close_date, close_date)`;
 
   const match = {
     platform: platform as Platform,

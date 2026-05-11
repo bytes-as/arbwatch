@@ -1,36 +1,51 @@
 import {
-  sqliteTable,
+  pgTable,
   text,
   integer,
-  blob,
+  bigint,
   real,
+  timestamp,
   check,
   primaryKey,
   unique,
-} from "drizzle-orm/sqlite-core";
+  customType,
+} from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+
+// bytea custom type that round-trips Buffer <-> hex string from Neon HTTP
+const bytea = customType<{ data: Buffer; driverData: string }>({
+  dataType() {
+    return "bytea";
+  },
+  toDriver(val: Buffer) {
+    return "\\x" + val.toString("hex");
+  },
+  fromDriver(val: unknown) {
+    const s = val as string;
+    return Buffer.from(s.startsWith("\\x") ? s.slice(2) : s, "hex");
+  },
+});
 
 // ---------------------------------------------------------------------------
 // users
 // ---------------------------------------------------------------------------
 
-export const users = sqliteTable(
+export const users = pgTable(
   "users",
   {
     id: text("id").primaryKey(),
     email: text("email").notNull().unique(),
-    emailVerified: integer("email_verified", { mode: "timestamp" }),
-    createdAt: integer("created_at", { mode: "timestamp" })
+    emailVerified: timestamp("email_verified", { mode: "date" }),
+    createdAt: bigint("created_at", { mode: "number" })
       .notNull()
-      .$defaultFn(() => new Date()),
-    anakinKeyCt: blob("anakin_key_ct"),
-    // Enum: ok | key-missing | key-invalid | quota-exhausted
+      .$defaultFn(() => Date.now()),
+    anakinKeyCt: bytea("anakin_key_ct"),
     anakinKeyStatus: text("anakin_key_status", {
       enum: ["ok", "key-missing", "key-invalid", "quota-exhausted"],
     })
       .notNull()
       .default("key-missing"),
-    anakinKeyStatusAt: integer("anakin_key_status_at", { mode: "timestamp" }),
+    anakinKeyStatusAt: bigint("anakin_key_status_at", { mode: "number" }),
   },
   (t) => [
     check(
@@ -44,7 +59,7 @@ export const users = sqliteTable(
 // watched_questions
 // ---------------------------------------------------------------------------
 
-export const watchedQuestions = sqliteTable(
+export const watchedQuestions = pgTable(
   "watched_questions",
   {
     id: text("id").primaryKey(),
@@ -52,11 +67,11 @@ export const watchedQuestions = sqliteTable(
       .notNull()
       .references(() => users.id),
     queryText: text("query_text").notNull(),
-    createdAt: integer("created_at", { mode: "timestamp" })
+    createdAt: bigint("created_at", { mode: "number" })
       .notNull()
-      .$defaultFn(() => new Date()),
+      .$defaultFn(() => Date.now()),
     threshold: real("threshold"),
-    embedding: blob("embedding"),
+    embedding: bytea("embedding"),
   },
   (t) => [
     check(
@@ -70,7 +85,7 @@ export const watchedQuestions = sqliteTable(
 // question_matches
 // ---------------------------------------------------------------------------
 
-export const questionMatches = sqliteTable(
+export const questionMatches = pgTable(
   "question_matches",
   {
     id: text("id").primaryKey(),
@@ -84,7 +99,7 @@ export const questionMatches = sqliteTable(
     marketUrl: text("market_url"),
     marketTitle: text("market_title"),
     impliedYesProb: real("implied_yes_prob"),
-    lastSeenAt: integer("last_seen_at").notNull(),
+    lastSeenAt: bigint("last_seen_at", { mode: "number" }).notNull(),
     matchScore: real("match_score"),
     closeDate: text("close_date"),
   },
@@ -95,7 +110,7 @@ export const questionMatches = sqliteTable(
 // spread_snapshots
 // ---------------------------------------------------------------------------
 
-export const spreadSnapshots = sqliteTable("spread_snapshots", {
+export const spreadSnapshots = pgTable("spread_snapshots", {
   id: text("id").primaryKey(),
   questionId: text("question_id")
     .notNull()
@@ -109,7 +124,7 @@ export const spreadSnapshots = sqliteTable("spread_snapshots", {
 // alerts
 // ---------------------------------------------------------------------------
 
-export const alerts = sqliteTable(
+export const alerts = pgTable(
   "alerts",
   {
     id: text("id").primaryKey(),
@@ -133,7 +148,7 @@ export const alerts = sqliteTable(
 // spread_history
 // ---------------------------------------------------------------------------
 
-export const spreadHistory = sqliteTable("spread_history", {
+export const spreadHistory = pgTable("spread_history", {
   id: text("id").primaryKey(),
   questionId: text("question_id")
     .notNull()
@@ -146,7 +161,7 @@ export const spreadHistory = sqliteTable("spread_history", {
 // push_subscriptions
 // ---------------------------------------------------------------------------
 
-export const pushSubscriptions = sqliteTable(
+export const pushSubscriptions = pgTable(
   "push_subscriptions",
   {
     id: text("id").primaryKey(),
@@ -165,7 +180,7 @@ export const pushSubscriptions = sqliteTable(
 // NextAuth v5 adapter tables
 // ---------------------------------------------------------------------------
 
-export const accounts = sqliteTable("accounts", {
+export const accounts = pgTable("accounts", {
   userId: text("userId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -181,20 +196,20 @@ export const accounts = sqliteTable("accounts", {
   session_state: text("session_state"),
 });
 
-export const sessions = sqliteTable("sessions", {
+export const sessions = pgTable("sessions", {
   sessionToken: text("sessionToken").primaryKey(),
   userId: text("userId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  expires: integer("expires", { mode: "timestamp_ms" }).notNull(),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
 });
 
-export const verificationTokens = sqliteTable(
+export const verificationTokens = pgTable(
   "verification_tokens",
   {
     identifier: text("identifier").notNull(),
     token: text("token").notNull(),
-    expires: integer("expires", { mode: "timestamp_ms" }).notNull(),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.identifier, t.token] })]
 );
