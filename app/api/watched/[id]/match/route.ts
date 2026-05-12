@@ -210,14 +210,31 @@ export async function POST(
   // Upsert into question_matches
   const matchInsertId = randomUUID();
   const nowMs = Date.now();
-  await rawQuery`INSERT INTO question_matches (id, question_id, platform, market_id, market_url, market_title, implied_yes_prob, last_seen_at, close_date)
-      VALUES (${matchInsertId}, ${id}, ${platform}, ${market_id}, ${resolved_market_url}, ${market_title}, ${implied_yes_prob}, ${nowMs}, ${close_date})
-      ON CONFLICT(question_id, platform) DO UPDATE SET
-        market_id = excluded.market_id,
-        market_url = excluded.market_url,
-        market_title = COALESCE(excluded.market_title, market_title),
-        implied_yes_prob = COALESCE(excluded.implied_yes_prob, implied_yes_prob),
-        close_date = COALESCE(excluded.close_date, close_date)`;
+  try {
+    await rawQuery`INSERT INTO question_matches (id, question_id, platform, market_id, market_url, market_title, implied_yes_prob, last_seen_at, close_date)
+        VALUES (${matchInsertId}, ${id}, ${platform}, ${market_id}, ${resolved_market_url}, ${market_title}, ${implied_yes_prob}, ${nowMs}, ${close_date})
+        ON CONFLICT(question_id, platform) DO UPDATE SET
+          market_id = excluded.market_id,
+          market_url = excluded.market_url,
+          market_title = COALESCE(excluded.market_title, market_title),
+          implied_yes_prob = COALESCE(excluded.implied_yes_prob, implied_yes_prob),
+          close_date = COALESCE(excluded.close_date, close_date)`;
+  } catch (dbErr) {
+    console.error("[match] DB upsert failed:", dbErr);
+    // Retry without close_date in case the column doesn't exist in this DB version
+    try {
+      await rawQuery`INSERT INTO question_matches (id, question_id, platform, market_id, market_url, market_title, implied_yes_prob, last_seen_at)
+          VALUES (${matchInsertId}, ${id}, ${platform}, ${market_id}, ${resolved_market_url}, ${market_title}, ${implied_yes_prob}, ${nowMs})
+          ON CONFLICT(question_id, platform) DO UPDATE SET
+            market_id = excluded.market_id,
+            market_url = excluded.market_url,
+            market_title = COALESCE(excluded.market_title, market_title),
+            implied_yes_prob = COALESCE(excluded.implied_yes_prob, implied_yes_prob)`;
+    } catch (retryErr) {
+      console.error("[match] DB upsert retry also failed:", retryErr);
+      return NextResponse.json({ error: "Failed to save match. Please try again." }, { status: 500 });
+    }
+  }
 
   const match = {
     platform: platform as Platform,

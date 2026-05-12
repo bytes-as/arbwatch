@@ -25,6 +25,8 @@ const _isNeon = getUrl().startsWith("postgres");
 let _neonDb: ReturnType<typeof import("drizzle-orm/neon-http").drizzle> | undefined;
 let _neonSql: ReturnType<typeof import("@neondatabase/serverless").neon> | undefined;
 
+let _neonMigrated = false;
+
 function getNeonClients() {
   if (!_neonDb || !_neonSql) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -36,6 +38,18 @@ function getNeonClients() {
     const url = getUrl();
     _neonSql = neon(url);
     _neonDb = drizzleNeon(_neonSql, { schema: pgSchema });
+
+    // Apply incremental column additions that may be missing from older Neon schemas.
+    // These are idempotent — IF NOT EXISTS means they're safe to run every cold start.
+    if (!_neonMigrated) {
+      _neonMigrated = true;
+      const sql = _neonSql;
+      Promise.all([
+        sql`ALTER TABLE question_matches ADD COLUMN IF NOT EXISTS market_title text`,
+        sql`ALTER TABLE question_matches ADD COLUMN IF NOT EXISTS close_date text`,
+        sql`ALTER TABLE question_matches ADD COLUMN IF NOT EXISTS match_score real`,
+      ]).catch((err) => console.warn("[db] Neon inline migration failed:", err));
+    }
   }
   return { neonDb: _neonDb!, neonSql: _neonSql! };
 }
@@ -72,8 +86,10 @@ function openEntry(url: string): DbEntry {
   const filePath = url.startsWith("file:") ? url.slice(5) : url;
   const sqliteInstance = new Database(filePath);
   sqliteInstance.pragma("journal_mode = WAL");
-  // Apply incremental schema migrations
-  try { sqliteInstance.exec("ALTER TABLE question_matches ADD COLUMN close_date TEXT"); } catch { /* column already exists */ }
+  // Apply incremental schema migrations (idempotent — catch = column already exists)
+  try { sqliteInstance.exec("ALTER TABLE question_matches ADD COLUMN market_title TEXT"); } catch { /* exists */ }
+  try { sqliteInstance.exec("ALTER TABLE question_matches ADD COLUMN close_date TEXT"); } catch { /* exists */ }
+  try { sqliteInstance.exec("ALTER TABLE question_matches ADD COLUMN match_score REAL"); } catch { /* exists */ }
   const db = drizzleSqlite(sqliteInstance, { schema: sqliteSchema });
   const ino = fileIno(filePath);
   const walIno = fileIno(filePath + "-wal");
