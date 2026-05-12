@@ -1,11 +1,10 @@
 /**
  * POST /api/watched/:id/match
+ * DELETE /api/watched/:id/match?platform=<platform>
  *
- * Manually links a platform market to a watched question via a pasted URL.
- * Validates the URL, extracts the market identifier, calls Wire to validate
- * and get fresh data, then upserts into question_matches.
+ * POST: Manually links a platform market to a watched question via a pasted URL.
+ * DELETE: Removes the match for a specific platform from this question.
  *
- * Body: { platform: string, url: string }
  * Auth-gated — scoped to requesting user only.
  */
 
@@ -136,25 +135,42 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  let body: { platform: string; url: string };
+  let body: {
+    platform: string;
+    url?: string;
+    market_id?: string;
+    market_title?: string;
+    implied_yes_prob?: number | null;
+  };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { platform, url } = body;
-  if (!platform || !url) {
-    return NextResponse.json({ error: "platform and url are required" }, { status: 400 });
+  const { platform } = body;
+  if (!platform) {
+    return NextResponse.json({ error: "platform is required" }, { status: 400 });
+  }
+  if (!body.url && !body.market_id) {
+    return NextResponse.json({ error: "url or market_id is required" }, { status: 400 });
   }
 
-  // Extract market identifier from URL
-  const parsed = await extractMarketIdentifier(session.userId, platform as Platform, url);
-  if (!parsed) {
-    return NextResponse.json({ error: "Could not parse market ID from URL" }, { status: 400 });
-  }
+  // If market_id is provided directly (e.g. from inline search results), skip URL parsing
+  let market_id: string;
+  let market_url: string | null;
 
-  const { market_id, market_url } = parsed;
+  if (body.market_id) {
+    market_id = body.market_id;
+    market_url = body.url || null;
+  } else {
+    const parsed = await extractMarketIdentifier(session.userId, platform as Platform, body.url!);
+    if (!parsed) {
+      return NextResponse.json({ error: "Could not parse market ID from URL" }, { status: 400 });
+    }
+    market_id = parsed.market_id;
+    market_url = parsed.market_url;
+  }
 
   // Call Wire to validate and get fresh data
   const DETAIL_ACTION: Record<string, string> = {
@@ -170,8 +186,9 @@ export async function POST(
     robinhood: (event_id) => ({ event_id }),
   };
 
-  let implied_yes_prob: number | null = null;
-  let market_title: string | null = null;
+  // Seed with pre-provided values from search results (used as fallback if Wire detail fails)
+  let implied_yes_prob: number | null = body.implied_yes_prob ?? null;
+  let market_title: string | null = body.market_title ?? null;
   let resolved_market_url: string | null = market_url;
   let close_date: string | null = null;
 
@@ -180,14 +197,14 @@ export async function POST(
     const detailParams = DETAIL_PARAMS[platform];
     if (action && detailParams) {
       const payload = await wireRequest(session.userId, action, detailParams(market_id));
-      implied_yes_prob = extractImpliedYesProb(platform, payload);
-      market_title = extractMarketTitle(platform as Platform, payload);
+      implied_yes_prob = extractImpliedYesProb(platform, payload) ?? implied_yes_prob;
+      market_title = extractMarketTitle(platform as Platform, payload) ?? market_title;
       const extractedUrl = extractMarketUrl(platform as Platform, payload);
       if (extractedUrl) resolved_market_url = extractedUrl;
       close_date = extractCloseDate(platform, payload);
     }
   } catch {
-    // Best-effort — upsert with null prob if Wire fails
+    // Best-effort — use pre-provided data from search if Wire detail fails
   }
 
   // Upsert into question_matches
@@ -212,4 +229,24 @@ export async function POST(
   };
 
   return NextResponse.json({ match });
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await resolveSession(request);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  const platform = request.nextUrl.searchParams.get("platform");
+  if (!platform) return NextResponse.json({ error: "platform query param required" }, { status: 400 });
+
+  // Verify question belongs to this user before touching matches
+  const questionRows = await rawQuery<{ id: string }>`SELECT id FROM watched_questions WHERE id = ${id} AND user_id = ${session.userId}`;
+  if (!questionRows[0]) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await rawQuery`DELETE FROM question_matches WHERE question_id = ${id} AND platform = ${platform}`;
+
+  return NextResponse.json({ ok: true });
 }

@@ -16,7 +16,7 @@ import { db } from "../../../db/client";
 import { sessions } from "../../../db/tables";
 import { eq, and, gt } from "drizzle-orm";
 import { WireError } from "../../../lib/wire/errors";
-import { searchAllPlatforms } from "../../../lib/marketSearch";
+import { searchAllPlatforms, searchPlatforms } from "../../../lib/marketSearch";
 
 export type { Platform, SearchResult } from "../../../lib/marketSearch";
 
@@ -54,10 +54,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ results: [] });
   }
 
-  // Use shared searchAllPlatforms — it fans out in parallel and merges results
+  const platformFilter = request.nextUrl.searchParams.get("platform") as import("../../../lib/marketSearch").Platform | null;
+
+  // Use shared search — fans out in parallel and merges results
   let results;
   try {
-    results = await searchAllPlatforms(session.userId, q);
+    results = platformFilter
+      ? await searchPlatforms(session.userId, q, [platformFilter])
+      : await searchAllPlatforms(session.userId, q);
   } catch (err) {
     if (err instanceof WireError) {
       console.warn(`[search] WireError thrown: ${err.class}`);

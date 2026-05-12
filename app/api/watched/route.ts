@@ -232,11 +232,24 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Return the newly created question including any matches so the client can
+  // update local state immediately without waiting for a router.refresh() round-trip.
+  const freshMatches = await rawQuery<{
+    platform: string;
+    market_id: string;
+    market_url: string | null;
+    market_title: string | null;
+    implied_yes_prob: number | null;
+    close_date: string | null;
+  }>`SELECT platform, market_id, market_url, market_title, implied_yes_prob, close_date
+       FROM question_matches WHERE question_id = ${id}`;
+
   const response: Record<string, unknown> = {
     id,
     query_text: trimmed,
     created_at: createdAt,
     spread: initialSpread,
+    matches: freshMatches,
   };
   if (matchingStatus) {
     response.matching_status = matchingStatus;

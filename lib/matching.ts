@@ -76,8 +76,7 @@ const PLATFORM_SEARCH_CONFIG: Array<{
   {
     platform: "kalshi",
     action: "kl_events",
-    // Kalshi has NO text search — get open events, embedding picks best
-    searchParams: () => ({ status: "open", with_nested_markets: true, limit: 50 }),
+    searchParams: (q) => ({ query: q, limit: 10 }),
   },
   {
     platform: "manifold",
@@ -120,7 +119,15 @@ function extractCandidates(
 ): Array<{ marketId: string; title: string | null }> {
   if (platform === "kalshi") {
     const p = payload as Record<string, unknown>;
-    // Search shape: events[*].markets[*]
+    // Query API shape: { markets: [{ market_id, title, ... }] }
+    if (Array.isArray(p.markets)) {
+      return (p.markets as Array<Record<string, unknown>>).flatMap((m) => {
+        const id = (m.market_id as string) ?? (m.ticker as string) ?? null;
+        const title = (m.title as string) ?? null;
+        return id ? [{ marketId: id, title }] : [];
+      });
+    }
+    // Bulk shape: { events: [{ event_ticker, markets: [{ticker, title}] }] }
     if (Array.isArray(p.events)) {
       const candidates: Array<{ marketId: string; title: string | null }> = [];
       for (const event of p.events as Array<Record<string, unknown>>) {
@@ -250,10 +257,47 @@ export async function matchQuestion(
       }
     }
 
+    // Without embeddings, guard against clearly wrong Kalshi matches.
+    // kl_events doesn't reliably filter by query — skip if the best candidate's
+    // title shares no significant tokens with the query text.
+    if (platform === "kalshi" && !embeddingScores && bestCandidate.title) {
+      const stopWords = new Set(["will", "the", "a", "an", "in", "on", "at", "by", "of", "to", "is", "be", "for", "or", "and", "that", "this"]);
+      const queryTokens = queryText.toLowerCase().split(/\W+/).filter((t) => t.length > 2 && !stopWords.has(t));
+      const titleLower = bestCandidate.title.toLowerCase();
+      const overlap = queryTokens.filter((t) => titleLower.includes(t)).length;
+      if (overlap === 0) {
+        console.log(`[matching] Kalshi: skipping low-confidence match "${bestCandidate.title}" for query "${queryText}"`);
+        continue;
+      }
+    }
+
     const marketId = bestCandidate.marketId;
     const marketTitle = bestCandidate.title;
-    const impliedYesProb = extractImpliedYesProb(platform, payload);
-    const marketUrl = extractMarketUrl(platform, payload);
+
+    // For Kalshi, build URL directly from market_id; extractMarketUrl only handles Manifold.
+    const marketUrl = platform === "kalshi"
+      ? `https://kalshi.com/markets/${marketId}`
+      : extractMarketUrl(platform, payload);
+
+    // For Kalshi, extractImpliedYesProb expects the detail payload shape (yes_bid_dollars).
+    // The query API returns plain integer cents on the market object directly.
+    // Extract from the best candidate's market entry in the flat markets array.
+    let impliedYesProb = extractImpliedYesProb(platform, payload);
+    if (platform === "kalshi" && impliedYesProb === null) {
+      const p = payload as Record<string, unknown>;
+      const marketsList = Array.isArray(p.markets) ? (p.markets as Array<Record<string, unknown>>) : [];
+      const marketEntry = marketsList.find(
+        (m) => ((m.market_id as string) ?? (m.ticker as string)) === marketId
+      ) ?? marketsList[0] ?? null;
+      if (marketEntry) {
+        const bid = typeof marketEntry.yes_bid === "number" ? marketEntry.yes_bid : null;
+        const ask = typeof marketEntry.yes_ask === "number" ? marketEntry.yes_ask : null;
+        const last = typeof marketEntry.last_price === "number" ? marketEntry.last_price : null;
+        if (bid !== null && ask !== null) impliedYesProb = (bid + ask) / 200;
+        else if (last !== null) impliedYesProb = last / 100;
+      }
+    }
+
     const matchScore = embeddingScores?.get(marketId) ?? null;
 
     const row: MatchRow = {
@@ -266,13 +310,15 @@ export async function matchQuestion(
 
     const matchRowId = randomUUID();
     const mUrl = marketUrl ?? null;
+    const mTitle = marketTitle ?? null;
     const mProb = impliedYesProb ?? null;
     await rawQuery`INSERT INTO question_matches
-           (id, question_id, platform, market_id, market_url, implied_yes_prob, last_seen_at)
-         VALUES (${matchRowId}, ${questionId}, ${platform}, ${marketId}, ${mUrl}, ${mProb}, ${now})
+           (id, question_id, platform, market_id, market_url, market_title, implied_yes_prob, last_seen_at)
+         VALUES (${matchRowId}, ${questionId}, ${platform}, ${marketId}, ${mUrl}, ${mTitle}, ${mProb}, ${now})
          ON CONFLICT (question_id, platform) DO UPDATE SET
            market_id = excluded.market_id,
            market_url = excluded.market_url,
+           market_title = COALESCE(excluded.market_title, market_title),
            implied_yes_prob = excluded.implied_yes_prob,
            last_seen_at = excluded.last_seen_at`;
 

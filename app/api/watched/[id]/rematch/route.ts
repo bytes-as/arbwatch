@@ -18,7 +18,7 @@ import { searchPlatforms } from "../../../../../lib/marketSearch";
 import type { Platform } from "../../../../../lib/marketSearch";
 import { randomUUID } from "node:crypto";
 
-const ALL_SEARCHABLE_PLATFORMS: Platform[] = ["manifold", "polymarket", "robinhood"];
+const ALL_SEARCHABLE_PLATFORMS: Platform[] = ["kalshi", "manifold", "polymarket", "robinhood"];
 
 const SESSION_COOKIE_NAME =
   process.env.NODE_ENV === "production"

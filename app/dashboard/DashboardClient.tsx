@@ -92,13 +92,16 @@ export default function DashboardClient({
             ArbWatch<span className="site-nav-logo-cursor" aria-hidden="true">|</span>
           </a>
           <div className="dashboard-nav-actions">
-            <a href="/about" className="link-primary dashboard-settings-link">
+            <a href="/about" className="nav-pill">
+              <span aria-hidden="true">?</span>
               About
             </a>
-            <a href="/settings/key" className="link-primary dashboard-settings-link">
+            <a href="/settings/key" className="nav-pill">
+              <span aria-hidden="true">⚙</span>
               Key settings
             </a>
-            <a href="/settings/notifications" className="link-primary dashboard-settings-link">
+            <a href="/settings/notifications" className="nav-pill">
+              <span aria-hidden="true">◎</span>
               Notifications
             </a>
           </div>

@@ -9,6 +9,7 @@ import {
   useMemo,
   FormEvent,
 } from "react";
+import { useRouter } from "next/navigation";
 import { addWatchedQuestionAction, removeWatchedQuestionAction } from "./actions";
 
 // ---------------------------------------------------------------------------
@@ -629,6 +630,16 @@ function QuestionDetailModal({ question, onClose, onThresholdChange, onMatchesCh
   const [editError, setEditError] = useState("");
   const [editSaving, setEditSaving] = useState(false);
 
+  // Per-platform delete state
+  const [deletingPlatform, setDeletingPlatform] = useState<Platform | null>(null);
+
+  // Per-platform search state
+  const [searchingPlatform, setSearchingPlatform] = useState<Platform | null>(null);
+  const [platformSearchQuery, setPlatformSearchQuery] = useState("");
+  const [platformSearchResults, setPlatformSearchResults] = useState<SearchResult[]>([]);
+  const [platformSearchLoading, setPlatformSearchLoading] = useState(false);
+  const platformSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Focus close button on mount
   useEffect(() => {
     closeRef.current?.focus();
@@ -665,6 +676,17 @@ function QuestionDetailModal({ question, onClose, onThresholdChange, onMatchesCh
         const map = new Map<string, FreshPrice>();
         for (const p of data.prices) map.set(p.platform, p);
         setFreshData(map);
+        // Propagate fresh prices back to the dashboard card
+        const updatedMatches = question.matches.map((m) => {
+          const fresh = map.get(m.platform);
+          if (!fresh) return m;
+          return {
+            ...m,
+            implied_yes_prob: fresh.implied_yes_prob ?? m.implied_yes_prob,
+            close_date: fresh.close_date ?? m.close_date,
+          };
+        });
+        onMatchesChange(question.id, updatedMatches);
       }
     } catch { /* best-effort */ } finally {
       setLoadingPrices(false);
@@ -679,6 +701,30 @@ function QuestionDetailModal({ question, onClose, onThresholdChange, onMatchesCh
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [question.id]);
+
+  // Debounced per-platform search
+  useEffect(() => {
+    if (!searchingPlatform || platformSearchQuery.trim().length < 2) {
+      setPlatformSearchResults([]);
+      return;
+    }
+    if (platformSearchDebounceRef.current) clearTimeout(platformSearchDebounceRef.current);
+    platformSearchDebounceRef.current = setTimeout(async () => {
+      setPlatformSearchLoading(true);
+      try {
+        const res = await fetch(
+          `/api/search?q=${encodeURIComponent(platformSearchQuery.trim())}&platform=${searchingPlatform}`,
+          { credentials: "include" }
+        );
+        if (res.ok) {
+          const data = await res.json() as { results: SearchResult[] };
+          setPlatformSearchResults(data.results ?? []);
+        }
+      } catch { /* ignore */ }
+      finally { setPlatformSearchLoading(false); }
+    }, 400);
+    return () => { if (platformSearchDebounceRef.current) clearTimeout(platformSearchDebounceRef.current); };
+  }, [searchingPlatform, platformSearchQuery]);
 
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [calcNotional, setCalcNotional] = useState(100);
@@ -723,6 +769,22 @@ function QuestionDetailModal({ question, onClose, onThresholdChange, onMatchesCh
     finally { setRematchingPlatform(null); }
   }
 
+  async function handleDeleteMatch(platform: Platform) {
+    setDeletingPlatform(platform);
+    setRematchError("");
+    try {
+      const res = await fetch(`/api/watched/${question.id}/match?platform=${encodeURIComponent(platform)}`, {
+        method: "DELETE", credentials: "include",
+      });
+      if (res.ok) {
+        onMatchesChange(question.id, question.matches.filter((m) => m.platform !== platform));
+      } else {
+        setRematchError(`Failed to remove ${platform} match. Try again.`);
+      }
+    } catch { setRematchError(`Failed to remove ${platform} match. Try again.`); }
+    finally { setDeletingPlatform(null); }
+  }
+
   async function handleSaveMatch(platform: Platform) {
     setEditSaving(true);
     setEditError("");
@@ -744,6 +806,40 @@ function QuestionDetailModal({ question, onClose, onThresholdChange, onMatchesCh
         setEditError(typeof body.error === "string" ? body.error : "Failed to link market.");
       }
     } catch { setEditError("Failed to link market."); }
+    finally { setEditSaving(false); }
+  }
+
+  async function handleSelectPlatformSearchResult(platform: Platform, result: SearchResult) {
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/watched/${question.id}/match`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platform,
+          url: result.market_url ?? "",
+          market_id: result.market_id,
+          market_title: result.market_title,
+          implied_yes_prob: result.implied_yes_prob,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const updated = [...question.matches.filter((m) => m.platform !== platform), data.match];
+        onMatchesChange(question.id, updated);
+        setSearchingPlatform(null);
+        setPlatformSearchQuery("");
+        setPlatformSearchResults([]);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error(`[match] failed ${res.status}:`, err);
+        setRematchError(typeof err.error === "string" ? err.error : "Failed to link market.");
+      }
+    } catch (err) {
+      console.error("[match] unexpected error:", err);
+      setRematchError("Failed to link market.");
+    }
     finally { setEditSaving(false); }
   }
 
@@ -807,7 +903,7 @@ function QuestionDetailModal({ question, onClose, onThresholdChange, onMatchesCh
       >
         {/* Header */}
         <div className="modal-header">
-          <h2 id="modal-title" className="modal-title">{question.query_text}</h2>
+          <h2 id="modal-title" className="modal-title" title={question.query_text}>{question.query_text}</h2>
           <button
             type="button"
             className="modal-rematch-btn btn-ghost"
@@ -939,7 +1035,56 @@ function QuestionDetailModal({ question, onClose, onThresholdChange, onMatchesCh
                           {editError && <p role="alert" className="field-error" style={{ marginTop: "0.25rem", fontSize: "0.8125rem" }}>{editError}</p>}
                         </div>
                       ) : (
-                        <span className="modal-platform-meta">No market found for this question</span>
+                        <>
+                          <span className="modal-platform-meta">No market found for this question</span>
+                          {searchingPlatform === platform && (
+                            <div style={{ marginTop: "0.5rem" }}>
+                              <input
+                                type="text"
+                                className="field-input"
+                                style={{ fontSize: "0.875rem", padding: "0.375rem 0.5rem", width: "100%" }}
+                                placeholder={`Search ${displayName}…`}
+                                value={platformSearchQuery}
+                                onChange={(e) => setPlatformSearchQuery(e.currentTarget.value)}
+                                autoFocus
+                              />
+                              {platformSearchLoading && (
+                                <p className="platform-search-status">Searching…</p>
+                              )}
+                              {!platformSearchLoading && platformSearchResults.length === 0 && platformSearchQuery.trim().length >= 2 && (
+                                <p className="platform-search-status">No results</p>
+                              )}
+                              {platformSearchResults.length > 0 && (
+                                <ul style={{ listStyle: "none", margin: "0.25rem 0 0", padding: 0 }}>
+                                  {platformSearchResults.slice(0, 5).map((r) => (
+                                    <li key={r.market_id}>
+                                      <button
+                                        type="button"
+                                        className="platform-search-result-btn"
+                                        onClick={() => handleSelectPlatformSearchResult(platform, r)}
+                                        disabled={editSaving}
+                                      >
+                                        <span className="platform-search-result-title">{r.market_title}</span>
+                                        {r.implied_yes_prob !== null && (
+                                          <span className="platform-search-result-prob">
+                                            {(r.implied_yes_prob * 100).toFixed(1)}%
+                                          </span>
+                                        )}
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                              <button
+                                type="button"
+                                className="platform-search-cancel"
+                                onClick={() => { setSearchingPlatform(null); setPlatformSearchQuery(""); setPlatformSearchResults([]); }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                     {!isEditingThis && (
@@ -961,10 +1106,25 @@ function QuestionDetailModal({ question, onClose, onThresholdChange, onMatchesCh
                           type="button"
                           className="modal-edit-platform-btn btn-ghost"
                           aria-label={`Manually link ${displayName} market`}
-                          onClick={() => { setEditingPlatform(platform); setEditUrl(""); setEditError(""); }}
+                          onClick={() => { setEditingPlatform(platform); setEditUrl(""); setEditError(""); setSearchingPlatform(null); }}
                           title={`Link ${displayName} market manually`}
                         >
                           ✏
+                        </button>
+                        <button
+                          type="button"
+                          className="modal-edit-platform-btn btn-ghost"
+                          aria-label={`Search ${displayName} for a different market`}
+                          title={`Search ${displayName}`}
+                          onClick={() => {
+                            setSearchingPlatform(platform);
+                            setPlatformSearchQuery("");
+                            setPlatformSearchResults([]);
+                            setEditingPlatform(null);
+                          }}
+                          style={searchingPlatform === platform ? { color: "var(--color-accent, #60a5fa)" } : undefined}
+                        >
+                          🔍
                         </button>
                       </div>
                     )}
@@ -993,7 +1153,7 @@ function QuestionDetailModal({ question, onClose, onThresholdChange, onMatchesCh
                       )}
                     </div>
                     {match.market_title && (
-                      <span className="modal-platform-title">{match.market_title}</span>
+                      <span className="modal-platform-title" title={match.market_title}>{match.market_title}</span>
                     )}
                     {volume !== null ? (
                       <span className="modal-platform-meta modal-platform-volume">
@@ -1040,8 +1200,108 @@ function QuestionDetailModal({ question, onClose, onThresholdChange, onMatchesCh
                         {editError && <p role="alert" className="field-error" style={{ marginTop: "0.25rem", fontSize: "0.8125rem" }}>{editError}</p>}
                       </div>
                     )}
+                    {searchingPlatform === platform && !isEditingThis && (
+                      <div style={{ marginTop: "0.5rem" }}>
+                        <input
+                          type="text"
+                          className="field-input"
+                          style={{ fontSize: "0.875rem", padding: "0.375rem 0.5rem", width: "100%" }}
+                          placeholder={`Search ${displayName}…`}
+                          value={platformSearchQuery}
+                          onChange={(e) => setPlatformSearchQuery(e.currentTarget.value)}
+                          autoFocus
+                        />
+                        {platformSearchLoading && (
+                          <p className="platform-search-status">Searching…</p>
+                        )}
+                        {!platformSearchLoading && platformSearchResults.length === 0 && platformSearchQuery.trim().length >= 2 && (
+                          <p className="platform-search-status">No results</p>
+                        )}
+                        {platformSearchResults.length > 0 && (
+                          <ul style={{ listStyle: "none", margin: "0.25rem 0 0", padding: 0 }}>
+                            {platformSearchResults.slice(0, 5).map((r) => (
+                              <li key={r.market_id}>
+                                <button
+                                  type="button"
+                                  className="platform-search-result-btn"
+                                  onClick={() => handleSelectPlatformSearchResult(platform, r)}
+                                  disabled={editSaving}
+                                >
+                                  <span className="platform-search-result-title">{r.market_title}</span>
+                                  {r.implied_yes_prob !== null && (
+                                    <span className="platform-search-result-prob">
+                                      {(r.implied_yes_prob * 100).toFixed(1)}%
+                                    </span>
+                                  )}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <button
+                          type="button"
+                          className="platform-search-cancel"
+                          onClick={() => { setSearchingPlatform(null); setPlatformSearchQuery(""); setPlatformSearchResults([]); }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div className="modal-platform-right">
+                    {!isEditingThis && (
+                      <div className="modal-platform-actions">
+                        <button
+                          type="button"
+                          className="modal-edit-platform-btn btn-ghost"
+                          aria-label={`Re-search ${displayName} for this question`}
+                          onClick={() => handleRematchPlatform(platform)}
+                          title={`Re-search ${displayName}`}
+                          disabled={rematchingPlatform === platform}
+                        >
+                          {rematchingPlatform === platform
+                            ? <span className="spinner" aria-hidden="true" style={{ borderColor: "rgba(0,0,0,0.2)", borderTopColor: "currentColor" }} />
+                            : "↻"}
+                        </button>
+                        <button
+                          type="button"
+                          className="modal-edit-platform-btn btn-ghost"
+                          aria-label={`Override ${displayName} market link`}
+                          onClick={() => { setEditingPlatform(platform); setEditUrl(""); setEditError(""); setSearchingPlatform(null); }}
+                          title={`Override ${displayName} market`}
+                        >
+                          ✏
+                        </button>
+                        <button
+                          type="button"
+                          className="modal-edit-platform-btn btn-ghost"
+                          aria-label={`Search ${displayName} for a different market`}
+                          title={`Search ${displayName}`}
+                          onClick={() => {
+                            setSearchingPlatform(platform);
+                            setPlatformSearchQuery("");
+                            setPlatformSearchResults([]);
+                            setEditingPlatform(null);
+                          }}
+                          style={searchingPlatform === platform ? { color: "var(--color-accent, #60a5fa)" } : undefined}
+                        >
+                          🔍
+                        </button>
+                        <button
+                          type="button"
+                          className="modal-edit-platform-btn btn-ghost"
+                          aria-label={`Remove ${displayName} match`}
+                          title={`Remove ${displayName} match`}
+                          onClick={() => handleDeleteMatch(platform)}
+                          disabled={deletingPlatform === platform}
+                          style={{ color: "var(--color-error-text, #f87171)" }}
+                        >
+                          {deletingPlatform === platform
+                            ? <span className="spinner" aria-hidden="true" style={{ borderColor: "rgba(0,0,0,0.2)", borderTopColor: "currentColor" }} />
+                            : "×"}
+                        </button>
+                      </div>
+                    )}
                     <span className={`modal-platform-prob${isRefreshing ? " modal-platform-prob--loading" : ""}`}>
                       {probDisplay}
                     </span>
@@ -1062,31 +1322,6 @@ function QuestionDetailModal({ question, onClose, onThresholdChange, onMatchesCh
                       >
                         ↗
                       </a>
-                    )}
-                    {!isEditingThis && (
-                      <>
-                        <button
-                          type="button"
-                          className="modal-edit-platform-btn btn-ghost"
-                          aria-label={`Re-search ${displayName} for this question`}
-                          onClick={() => handleRematchPlatform(platform)}
-                          title={`Re-search ${displayName}`}
-                          disabled={rematchingPlatform === platform}
-                        >
-                          {rematchingPlatform === platform
-                            ? <span className="spinner" aria-hidden="true" style={{ borderColor: "rgba(0,0,0,0.2)", borderTopColor: "currentColor" }} />
-                            : "↻"}
-                        </button>
-                        <button
-                          type="button"
-                          className="modal-edit-platform-btn btn-ghost"
-                          aria-label={`Override ${displayName} market link`}
-                          onClick={() => { setEditingPlatform(platform); setEditUrl(""); setEditError(""); }}
-                          title={`Override ${displayName} market`}
-                        >
-                          ✏
-                        </button>
-                      </>
                     )}
                   </div>
                 </li>
@@ -1318,7 +1553,7 @@ function WatchedRow({
         <button
           type="button"
           className="watched-query-text watched-query-text--btn"
-          title="Click for details"
+          title={question.query_text}
           onClick={() => onOpenDetail(question.id)}
         >
           {question.query_text}
@@ -1426,7 +1661,9 @@ interface SearchDropdownProps {
 function SearchDropdown({ results, isLoading, query, onSelect, listboxId }: SearchDropdownProps) {
   if (!query || query.length < 2) return null;
 
-  if (isLoading) {
+  // While re-fetching with existing results: keep showing them (stale-while-revalidate).
+  // Only show the full loading spinner when there are no results yet.
+  if (isLoading && results.length === 0) {
     return (
       <div className="search-dropdown" role="status" aria-live="polite">
         <div className="search-dropdown-loading">
@@ -1437,7 +1674,7 @@ function SearchDropdown({ results, isLoading, query, onSelect, listboxId }: Sear
     );
   }
 
-  if (results.length === 0) {
+  if (!isLoading && results.length === 0) {
     return (
       <div className="search-dropdown" role="status" aria-live="polite">
         <div className="search-dropdown-empty">No markets found for &ldquo;{query}&rdquo;</div>
@@ -1499,6 +1736,7 @@ function SearchDropdown({ results, isLoading, query, onSelect, listboxId }: Sear
 // ---------------------------------------------------------------------------
 
 export default function WatchedSection({ initialQuestions }: WatchedSectionProps) {
+  const router = useRouter();
   const [questions, setQuestions] = useState<WatchedQuestion[]>(initialQuestions);
   const [inputValue, setInputValue] = useState("");
   const [confirmRowId, setConfirmRowId] = useState<string | null>(null);
@@ -1509,10 +1747,29 @@ export default function WatchedSection({ initialQuestions }: WatchedSectionProps
   const [showDropdown, setShowDropdown] = useState(false);
   const [detailQuestionId, setDetailQuestionId] = useState<string | null>(null);
 
+  // Auto-explore state
+  const [exploreOpen, setExploreOpen] = useState(false);
+  const [exploreJobId, setExploreJobId] = useState<string | null>(null);
+  const [exploreStatus, setExploreStatus] = useState<"idle" | "loading" | "polling" | "done" | "error">("idle");
+  const [exploreQuestions, setExploreQuestions] = useState<Array<{
+    question_text: string;
+    estimated_spread: number | null;
+    matches: Array<{ platform: Platform; market_id: string; market_url: string | null; market_title: string; implied_yes_prob: number | null }>;
+  }>>([]);
+  const [exploreError, setExploreError] = useState("");
+  const [exploreAdding, setExploreAdding] = useState<string | null>(null);
+  const explorePollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const removeButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
+
+  // Sync server-rendered questions into local state when the page refreshes
+  useEffect(() => {
+    setQuestions(initialQuestions);
+  }, [initialQuestions]);
 
   // Server Action state (pre-hydration fallback — not used for live search flow)
   const [, addFormAction] = useActionState(addWatchedQuestionAction, null);
@@ -1541,22 +1798,30 @@ export default function WatchedSection({ initialQuestions }: WatchedSectionProps
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
+      // Cancel any in-flight request so stale results don't overwrite newer ones
+      if (searchAbortRef.current) searchAbortRef.current.abort();
+      const controller = new AbortController();
+      searchAbortRef.current = controller;
+
       setSearchLoading(true);
       setShowDropdown(true);
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, {
           credentials: "include",
+          signal: controller.signal,
         });
+        const data = (await res.json().catch(() => ({}))) as { results?: SearchResult[]; error?: string };
         if (res.ok) {
-          const data = (await res.json()) as { results: SearchResult[] };
           setSearchResults(data.results ?? []);
         } else {
+          console.warn(`[search] API error ${res.status}:`, data.error ?? "unknown");
           setSearchResults([]);
         }
-      } catch {
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return; // superseded by newer request
         setSearchResults([]);
       } finally {
-        setSearchLoading(false);
+        if (!controller.signal.aborted) setSearchLoading(false);
       }
     }, SEARCH_DEBOUNCE_MS);
 
@@ -1597,6 +1862,125 @@ export default function WatchedSection({ initialQuestions }: WatchedSectionProps
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [showDropdown, confirmRowId]);
 
+  // Auto-explore: submit job then poll
+  async function handleExplore() {
+    setExploreOpen(true);
+    setExploreStatus("loading");
+    setExploreError("");
+    setExploreQuestions([]);
+    if (explorePollRef.current) clearTimeout(explorePollRef.current);
+    try {
+      const res = await fetch("/api/explore", { method: "POST", credentials: "include" });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error((d as { error?: string }).error ?? "Failed to start explore");
+      }
+      const { jobId } = await res.json() as { jobId: string };
+      setExploreJobId(jobId);
+      setExploreStatus("polling");
+      pollExploreJob(jobId);
+    } catch (e) {
+      setExploreStatus("error");
+      setExploreError(e instanceof Error ? e.message : "Something went wrong");
+    }
+  }
+
+  function pollExploreJob(jobId: string) {
+    explorePollRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/explore?jobId=${encodeURIComponent(jobId)}`, { credentials: "include" });
+        if (!res.ok) throw new Error("Poll failed");
+        const data = await res.json() as { status: string; questions?: typeof exploreQuestions };
+        if (data.status === "completed") {
+          setExploreQuestions(data.questions ?? []);
+          setExploreStatus("done");
+        } else if (data.status === "failed") {
+          setExploreStatus("error");
+          setExploreError("Explore job failed. Try again.");
+        } else {
+          // still pending/processing — keep polling
+          pollExploreJob(jobId);
+        }
+      } catch {
+        setExploreStatus("error");
+        setExploreError("Lost connection while exploring. Try again.");
+      }
+    }, 10_000);
+  }
+
+  function handleCloseExplore() {
+    setExploreOpen(false);
+    setExploreStatus("idle");
+    setExploreJobId(null);
+    setExploreQuestions([]);
+    setExploreError("");
+    if (explorePollRef.current) clearTimeout(explorePollRef.current);
+  }
+
+  async function handleAddExploreQuestion(opp: { question_text: string; matches: Array<{ platform: Platform; market_id: string; market_url: string | null; market_title: string; implied_yes_prob: number | null }> }) {
+    setExploreAdding(opp.question_text);
+    try {
+      const res = await fetch("/api/watched", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query_text: opp.question_text, pre_matches: opp.matches }),
+      });
+      if (res.ok) {
+        const data = await res.json() as {
+          id: string;
+          query_text: string;
+          created_at: number;
+          spread: number | null;
+          matches: PlatformMatch[];
+        };
+
+        // Add immediately so the card appears
+        const newQuestion: WatchedQuestion = {
+          id: data.id,
+          query_text: data.query_text,
+          created_at: data.created_at,
+          spread: data.spread,
+          last_updated: null,
+          threshold: null,
+          matches: data.matches ?? [],
+          history: [],
+          pending: false,
+        };
+        setQuestions((prev) => [...prev, newQuestion]);
+        handleCloseExplore();
+
+        // Fetch live prices in the background and update the card
+        fetch(`/api/watched/${data.id}/prices`, { credentials: "include" })
+          .then((r) => r.ok ? r.json() as Promise<{ prices: Array<{ platform: string; implied_yes_prob: number | null; close_date: string | null }> }> : null)
+          .then((priceData) => {
+            if (!priceData) return;
+            const priceMap = new Map(priceData.prices.map((p) => [p.platform, p]));
+            const updatedMatches = newQuestion.matches.map((m) => {
+              const fresh = priceMap.get(m.platform);
+              if (!fresh) return m;
+              return { ...m, implied_yes_prob: fresh.implied_yes_prob ?? m.implied_yes_prob, close_date: fresh.close_date ?? m.close_date };
+            });
+            const probs = updatedMatches.map((m) => m.implied_yes_prob).filter((p): p is number => p !== null);
+            const newSpread = probs.length >= 2 ? Math.max(...probs) - Math.min(...probs) : null;
+            setQuestions((prev) => prev.map((q) =>
+              q.id === data.id
+                ? { ...q, matches: updatedMatches, spread: newSpread, last_updated: Math.floor(Date.now() / 1000) }
+                : q
+            ));
+          })
+          .catch(() => { /* best-effort */ });
+      } else {
+        const d = await res.json().catch(() => ({})) as { error?: string };
+        setExploreError(d.error ?? "Failed to add question.");
+      }
+    } catch {
+      setExploreError("Network error. Try again.");
+    } finally {
+      setExploreAdding(null);
+    }
+  }
+
   // Add a market selected from search results (optimistic — shows card immediately)
   function handleSelectResult(result: SearchResult, allResults: SearchResult[]) {
     if (atCap) return;
@@ -1605,17 +1989,26 @@ export default function WatchedSection({ initialQuestions }: WatchedSectionProps
     // Use the selected market's title as the query_text
     const queryText = result.market_title;
 
-    // Deduplicate by platform — keep first occurrence (highest search relevance).
-    const seenPlatforms = new Set<string>();
-    const preMatches = allResults
-      .filter((r) => { if (seenPlatforms.has(r.platform)) return false; seenPlatforms.add(r.platform); return true; })
-      .map((r) => ({
-        platform: r.platform,
-        market_id: r.market_id,
-        market_title: r.market_title,
-        market_url: r.market_url,
-        implied_yes_prob: r.implied_yes_prob,
-      }));
+    // Always use the clicked result for its own platform; first result for others.
+    const seenPlatforms = new Set<string>([result.platform]);
+    const preMatches = [
+      {
+        platform: result.platform,
+        market_id: result.market_id,
+        market_title: result.market_title,
+        market_url: result.market_url,
+        implied_yes_prob: result.implied_yes_prob,
+      },
+      ...allResults
+        .filter((r) => { if (seenPlatforms.has(r.platform)) return false; seenPlatforms.add(r.platform); return true; })
+        .map((r) => ({
+          platform: r.platform,
+          market_id: r.market_id,
+          market_title: r.market_title,
+          market_url: r.market_url,
+          implied_yes_prob: r.implied_yes_prob,
+        })),
+    ];
 
     // Build match list for immediate UI feedback
     const matchList: PlatformMatch[] = preMatches
@@ -1706,7 +2099,16 @@ export default function WatchedSection({ initialQuestions }: WatchedSectionProps
   const handleMatchesChange = useCallback(
     (id: string, newMatches: PlatformMatch[]) => {
       setQuestions((prev) =>
-        prev.map((q) => (q.id === id ? { ...q, matches: newMatches } : q))
+        prev.map((q) => {
+          if (q.id !== id) return q;
+          const probs = newMatches
+            .map((m) => m.implied_yes_prob)
+            .filter((p): p is number => p !== null);
+          const newSpread = probs.length >= 2
+            ? Math.max(...probs) - Math.min(...probs)
+            : q.spread;
+          return { ...q, matches: newMatches, spread: newSpread };
+        })
       );
     },
     []
@@ -1869,6 +2271,16 @@ export default function WatchedSection({ initialQuestions }: WatchedSectionProps
             </div>
           </form>
 
+          <button
+            type="button"
+            className="explore-btn"
+            onClick={handleExplore}
+            disabled={exploreStatus === "loading" || exploreStatus === "polling"}
+            title="Auto-explore spread opportunities"
+          >
+            ✦ Explore
+          </button>
+
           {showDropdown && !atCap && (
             <SearchDropdown
               listboxId="search-listbox"
@@ -1892,6 +2304,73 @@ export default function WatchedSection({ initialQuestions }: WatchedSectionProps
           </p>
         )}
       </section>
+
+      {/* Auto-explore modal */}
+      {exploreOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Explore spread opportunities">
+          <div className="modal explore-modal">
+            <div className="modal-header">
+              <h2 className="modal-title">✦ Spread Opportunities</h2>
+              <button type="button" className="modal-close btn-ghost" onClick={handleCloseExplore} aria-label="Close explore">×</button>
+            </div>
+
+            {(exploreStatus === "loading" || exploreStatus === "polling") && (
+              <div className="explore-loading">
+                <span className="spinner explore-spinner" aria-hidden="true" />
+                <p className="explore-loading-text">
+                  Searching the web for arbitrage opportunities…
+                  <br />
+                  <span className="explore-loading-sub">This takes about a minute.</span>
+                </p>
+              </div>
+            )}
+
+            {exploreStatus === "error" && (
+              <div className="explore-error">
+                <p>{exploreError}</p>
+                <button type="button" className="btn-ghost" onClick={handleExplore}>Try again</button>
+              </div>
+            )}
+
+            {exploreStatus === "done" && (
+              <div className="explore-results">
+                {exploreQuestions.length === 0 ? (
+                  <p className="explore-empty">No opportunities found. Try again.</p>
+                ) : (
+                  <ul className="explore-list">
+                    {exploreQuestions.map((opp) => (
+                      <li key={opp.question_text} className="explore-item">
+                        <div className="explore-item-body">
+                          <p className="explore-item-text">{opp.question_text}</p>
+                          <div className="explore-item-meta">
+                            {opp.estimated_spread !== null && (
+                              <span className="explore-item-spread">{(opp.estimated_spread * 100).toFixed(1)}% spread</span>
+                            )}
+                            <span className="explore-item-platforms">
+                              {opp.matches.map((m) => m.platform).join(" · ")}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-primary explore-item-add"
+                          onClick={() => handleAddExploreQuestion(opp)}
+                          disabled={exploreAdding === opp.question_text || atCap}
+                          title={atCap ? "Question cap reached" : "Watch this question"}
+                        >
+                          {exploreAdding === opp.question_text
+                            ? <span className="spinner" aria-hidden="true" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+                            : "+ Watch"}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Watched questions list */}
       <section aria-label="Your watched markets">
